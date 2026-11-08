@@ -1,0 +1,257 @@
+openapi: 3.1.0
+info:
+  title: Bookings API
+  version: 0.1.0
+  description: |
+    Organizers publish events with a fixed number of seats. Attendees book and cancel seats.
+    Every route needs a Cognito access token (`Authorization: Bearer <token>`). Roles come from the
+    `organizers` and `attendees` Cognito groups. Errors use RFC 9457 problem details.
+servers:
+  - url: https://{apiId}.execute-api.{region}.amazonaws.com
+    variables:
+      apiId: { default: example }
+      region: { default: eu-west-1 }
+security:
+  - cognito: []
+
+paths:
+  /events:
+    post:
+      summary: Create an event (organizers only)
+      operationId: createEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateEvent" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+    get:
+      summary: List upcoming events, soonest first
+      operationId: listEvents
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventPage" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /events/{eventId}:
+    get:
+      summary: Get one event
+      operationId: getEvent
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: The event
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/Problem" }
+
+  /events/{eventId}/bookings:
+    post:
+      summary: Book seats (attendees only, idempotent)
+      description: |
+        Seats are taken in one DynamoDB transaction with a condition on the remaining seats, so an event
+        is never oversold. Send a fresh `Idempotency-Key` per booking attempt and reuse it on retries:
+        a retry returns the original booking (201) without booking again.
+      operationId: bookSeats
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: 8-128 printable ASCII characters, scoped to the caller. A UUID is the expected choice.
+          schema: { type: string, pattern: "^[\\x21-\\x7E]{8,128}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [seats]
+              properties:
+                seats: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        "201":
+          description: Booked (or the replay of an earlier booking with the same key)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Booking" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: "`ATTENDEE_ONLY`"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409":
+          description: "`SOLD_OUT`, `ALREADY_BOOKED`, `CONCURRENT_UPDATE` (retry) or `REQUEST_IN_PROGRESS` (same key still running)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: "`EVENT_STARTED` or `IDEMPOTENCY_KEY_REUSED` (same key, different body)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /events/{eventId}/bookings/{bookingId}:
+    delete:
+      summary: Cancel your booking and return the seats
+      operationId: cancelBooking
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The cancelled booking
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Booking" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`BOOKING_NOT_FOUND`, also returned for someone else's booking"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+
+  /me/bookings:
+    get:
+      summary: List the caller's bookings, newest first
+      operationId: listMyBookings
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of bookings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingPage" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    cognito:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Cognito user pool access token, checked by the API Gateway JWT authorizer.
+
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque `nextCursor` from the previous page.
+      schema: { type: string, maxLength: 2048 }
+
+  responses:
+    Problem:
+      description: Problem details
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing or invalid token (returned by API Gateway, not by the functions)
+
+  schemas:
+    CreateEvent:
+      type: object
+      additionalProperties: false
+      required: [title, venue, startsAt, capacity]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 120 }
+        venue: { type: string, minLength: 2, maxLength: 120 }
+        startsAt: { type: string, format: date-time, description: Must be in the future. }
+        capacity: { type: integer, minimum: 1, maximum: 10000 }
+    Event:
+      type: object
+      required: [id, title, venue, startsAt, capacity, seatsRemaining, organizerId, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        venue: { type: string }
+        startsAt: { type: string, format: date-time }
+        capacity: { type: integer }
+        seatsRemaining: { type: integer, minimum: 0 }
+        organizerId: { type: string }
+        createdAt: { type: string, format: date-time }
+    EventPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Event" } }
+        nextCursor: { type: [string, "null"] }
+    Booking:
+      type: object
+      required: [id, eventId, seats, status, createdAt, cancelledAt, event]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        seats: { type: integer, minimum: 1, maximum: 10 }
+        status: { type: string, enum: [CONFIRMED, CANCELLED] }
+        createdAt: { type: string, format: date-time }
+        cancelledAt: { type: [string, "null"], format: date-time }
+        event:
+          type: object
+          required: [title, startsAt]
+          properties:
+            title: { type: string }
+            startsAt: { type: string, format: date-time }
+    BookingPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Booking" } }
+        nextCursor: { type: [string, "null"] }
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code:
+          type: string
+          examples: [VALIDATION_FAILED, SOLD_OUT, IDEMPOTENCY_KEY_REUSED]
+        detail: { type: string }
+        errors:
+          type: object
+          description: Field-level messages for `VALIDATION_FAILED`.
+          additionalProperties: { type: array, items: { type: string } }

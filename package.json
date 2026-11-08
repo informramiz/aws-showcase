@@ -1,0 +1,53 @@
+{
+  "name": "bookings-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serverless Bookings API on AWS: API Gateway HTTP API, Lambda, DynamoDB, Cognito, EventBridge and SQS, defined with CDK.",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:infra": "vitest run --project infra",
+    "test:coverage": "vitest run --coverage",
+    "synth": "cdk synth --quiet",
+    "cdk": "cdk"
+  },
+  "dependencies": {
+    "@aws-lambda-powertools/batch": "2.36.0",
+    "@aws-lambda-powertools/idempotency": "2.36.0",
+    "@aws-lambda-powertools/logger": "2.36.0",
+    "@aws-lambda-powertools/metrics": "2.36.0",
+    "@aws-lambda-powertools/tracer": "2.36.0",
+    "@aws-sdk/client-dynamodb": "3.1164.0",
+    "@aws-sdk/client-eventbridge": "3.1164.0",
+    "@aws-sdk/lib-dynamodb": "3.1164.0",
+    "@middy/core": "7.9.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/aws-lambda": "8.10.164",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.1.0",
+    "aws-cdk": "2.1148.0",
+    "aws-cdk-lib": "2.275.0",
+    "cdk-nag": "3.0.2",
+    "constructs": "10.8.1",
+    "esbuild": "0.28.2",
+    "eslint": "10.14.0",
+    "prettier": "3.9.10",
+    "testcontainers": "12.2.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.1.0"
+  }
+}

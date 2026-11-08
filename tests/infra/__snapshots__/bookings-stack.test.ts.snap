@@ -1,0 +1,1960 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
+"{
+  "Resources": {
+    "DataTableFDBAD0F2": {
+      "Type": "AWS::DynamoDB::GlobalTable",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "PK",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "SK",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "GSI1PK",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "GSI1SK",
+            "AttributeType": "S"
+          }
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "GSI1",
+            "KeySchema": [
+              {
+                "AttributeName": "GSI1PK",
+                "KeyType": "HASH"
+              },
+              {
+                "AttributeName": "GSI1SK",
+                "KeyType": "RANGE"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "PK",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "SK",
+            "KeyType": "RANGE"
+          }
+        ],
+        "Replicas": [
+          {
+            "GlobalSecondaryIndexes": [
+              {
+                "IndexName": "GSI1"
+              }
+            ],
+            "PointInTimeRecoverySpecification": {
+              "PointInTimeRecoveryEnabled": true
+            },
+            "Region": {
+              "Ref": "AWS::Region"
+            }
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "DataIdempotencyTable36C198C8": {
+      "Type": "AWS::DynamoDB::GlobalTable",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "Replicas": [
+          {
+            "PointInTimeRecoverySpecification": {
+              "PointInTimeRecoveryEnabled": true
+            },
+            "Region": {
+              "Ref": "AWS::Region"
+            }
+          }
+        ],
+        "TimeToLiveSpecification": {
+          "AttributeName": "expiration",
+          "Enabled": true
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "AuthUserPool8115E87F": {
+      "Type": "AWS::Cognito::UserPool",
+      "Properties": {
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "verified_email",
+              "Priority": 1
+            }
+          ]
+        },
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true
+        },
+        "AutoVerifiedAttributes": [
+          "email"
+        ],
+        "EmailVerificationMessage": "The verification code to your new account is {####}",
+        "EmailVerificationSubject": "Verify your new account",
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 12,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": true,
+            "RequireUppercase": true
+          }
+        },
+        "SmsVerificationMessage": "The verification code to your new account is {####}",
+        "UsernameAttributes": [
+          "email"
+        ],
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_CODE",
+          "EmailMessage": "The verification code to your new account is {####}",
+          "EmailSubject": "Verify your new account",
+          "SmsMessage": "The verification code to your new account is {####}"
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "AuthUserPoolApiClient9CFE2E12": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Properties": {
+        "AccessTokenValidity": 60,
+        "AllowedOAuthFlows": [
+          "implicit",
+          "code"
+        ],
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthScopes": [
+          "profile",
+          "phone",
+          "email",
+          "openid",
+          "aws.cognito.signin.user.admin"
+        ],
+        "CallbackURLs": [
+          "https://example.com"
+        ],
+        "ExplicitAuthFlows": [
+          "ALLOW_USER_PASSWORD_AUTH",
+          "ALLOW_USER_SRP_AUTH",
+          "ALLOW_REFRESH_TOKEN_AUTH"
+        ],
+        "GenerateSecret": false,
+        "IdTokenValidity": 60,
+        "PreventUserExistenceErrors": "ENABLED",
+        "RefreshTokenValidity": 1440,
+        "SupportedIdentityProviders": [
+          "COGNITO"
+        ],
+        "TokenValidityUnits": {
+          "AccessToken": "minutes",
+          "IdToken": "minutes",
+          "RefreshToken": "minutes"
+        },
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F"
+        }
+      }
+    },
+    "AuthOrganizersGroupDAFA9A93": {
+      "Type": "AWS::Cognito::UserPoolGroup",
+      "Properties": {
+        "GroupName": "organizers",
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F"
+        }
+      }
+    },
+    "AuthAttendeesGroupAA21B91A": {
+      "Type": "AWS::Cognito::UserPoolGroup",
+      "Properties": {
+        "GroupName": "attendees",
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F"
+        }
+      }
+    },
+    "MessagingBus52612CDD": {
+      "Type": "AWS::Events::EventBus",
+      "Properties": {
+        "Name": "TestMessagingBusF7EA6CBC"
+      }
+    },
+    "MessagingNotificationsDlq409CA652": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "SqsManagedSseEnabled": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "MessagingNotificationsDlqPolicyD4F54F5C": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingNotificationsDlq409CA652",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Queues": [
+          {
+            "Ref": "MessagingNotificationsDlq409CA652"
+          }
+        ]
+      }
+    },
+    "MessagingNotificationsQueue8FE33CAB": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "MessagingNotificationsDlq409CA652",
+              "Arn"
+            ]
+          },
+          "maxReceiveCount": 3
+        },
+        "SqsManagedSseEnabled": true,
+        "VisibilityTimeout": 180
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "MessagingNotificationsQueuePolicy2CEB0CB8": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingNotificationsQueue8FE33CAB",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl"
+              ],
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "MessagingBookingEventsRuleE31E460E",
+                      "Arn"
+                    ]
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingNotificationsQueue8FE33CAB",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Queues": [
+          {
+            "Ref": "MessagingNotificationsQueue8FE33CAB"
+          }
+        ]
+      }
+    },
+    "MessagingBookingEventsRuleE31E460E": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "EventBusName": {
+          "Ref": "MessagingBus52612CDD"
+        },
+        "EventPattern": {
+          "source": [
+            "bookings-api"
+          ],
+          "detail-type": [
+            "BookingConfirmed",
+            "BookingCancelled"
+          ]
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "MessagingNotificationsQueue8FE33CAB",
+                "Arn"
+              ]
+            },
+            "Id": "Target0"
+          }
+        ]
+      }
+    },
+    "CreateEventLogsA9A7402A": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "CreateEventRoleA54BAC4C": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "CreateEventRoleDefaultPolicyF66B2364": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CreateEventLogsA9A7402A",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "dynamodb:PutItem",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "CreateEventRoleDefaultPolicyF66B2364",
+        "Roles": [
+          {
+            "Ref": "CreateEventRoleA54BAC4C"
+          }
+        ]
+      }
+    },
+    "CreateEventFn7A5C2858": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "events",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "CreateEventLogsA9A7402A"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "CreateEventRoleA54BAC4C",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "CreateEventRoleDefaultPolicyF66B2364",
+        "CreateEventRoleA54BAC4C"
+      ]
+    },
+    "ListEventsLogs70D01CBD": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "ListEventsRoleE51AB8F4": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "ListEventsRoleDefaultPolicy09BC7447": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ListEventsLogs70D01CBD",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "dynamodb:Query",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "ListEventsRoleDefaultPolicy09BC7447",
+        "Roles": [
+          {
+            "Ref": "ListEventsRoleE51AB8F4"
+          }
+        ]
+      }
+    },
+    "ListEventsFn77BDF55D": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "events",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "ListEventsLogs70D01CBD"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "ListEventsRoleE51AB8F4",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "ListEventsRoleDefaultPolicy09BC7447",
+        "ListEventsRoleE51AB8F4"
+      ]
+    },
+    "GetEventLogs6F9B70DA": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "GetEventRoleBC110A8F": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "GetEventRoleDefaultPolicyAA22406E": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "GetEventLogs6F9B70DA",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "dynamodb:GetItem",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "GetEventRoleDefaultPolicyAA22406E",
+        "Roles": [
+          {
+            "Ref": "GetEventRoleBC110A8F"
+          }
+        ]
+      }
+    },
+    "GetEventFnDA25FC75": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "events",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "GetEventLogs6F9B70DA"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "GetEventRoleBC110A8F",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "GetEventRoleDefaultPolicyAA22406E",
+        "GetEventRoleBC110A8F"
+      ]
+    },
+    "BookSeatsLogs87B446D3": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "BookSeatsRoleE2587D28": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "BookSeatsRoleDefaultPolicy64D91B7A": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "BookSeatsLogs87B446D3",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:ConditionCheckItem"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DataIdempotencyTable36C198C8",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingBus52612CDD",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "BookSeatsRoleDefaultPolicy64D91B7A",
+        "Roles": [
+          {
+            "Ref": "BookSeatsRoleE2587D28"
+          }
+        ]
+      }
+    },
+    "BookSeatsFnEBEF0FFD": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "bookings",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            },
+            "IDEMPOTENCY_TABLE_NAME": {
+              "Ref": "DataIdempotencyTable36C198C8"
+            },
+            "EVENT_BUS_NAME": {
+              "Ref": "MessagingBus52612CDD"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "BookSeatsLogs87B446D3"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "BookSeatsRoleE2587D28",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "BookSeatsRoleDefaultPolicy64D91B7A",
+        "BookSeatsRoleE2587D28"
+      ]
+    },
+    "CancelBookingLogs991B9AD3": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "CancelBookingRoleB50ED86F": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "CancelBookingRoleDefaultPolicy950E5FFB": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CancelBookingLogs991B9AD3",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingBus52612CDD",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "CancelBookingRoleDefaultPolicy950E5FFB",
+        "Roles": [
+          {
+            "Ref": "CancelBookingRoleB50ED86F"
+          }
+        ]
+      }
+    },
+    "CancelBookingFn220ED039": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "bookings",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            },
+            "EVENT_BUS_NAME": {
+              "Ref": "MessagingBus52612CDD"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "CancelBookingLogs991B9AD3"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "CancelBookingRoleB50ED86F",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "CancelBookingRoleDefaultPolicy950E5FFB",
+        "CancelBookingRoleB50ED86F"
+      ]
+    },
+    "ListMyBookingsLogs4CFE3E33": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "ListMyBookingsRoleF3A22E66": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "ListMyBookingsRoleDefaultPolicyBC5A0401": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ListMyBookingsLogs4CFE3E33",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "dynamodb:Query",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "ListMyBookingsRoleDefaultPolicyBC5A0401",
+        "Roles": [
+          {
+            "Ref": "ListMyBookingsRoleF3A22E66"
+          }
+        ]
+      }
+    },
+    "ListMyBookingsFn9EBE10D1": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "bookings",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "ListMyBookingsLogs4CFE3E33"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "ListMyBookingsRoleF3A22E66",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "ListMyBookingsRoleDefaultPolicyBC5A0401",
+        "ListMyBookingsRoleF3A22E66"
+      ]
+    },
+    "NotificationWorkerLogs81C7AD23": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "NotificationWorkerRole13675B8E": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "NotificationWorkerRoleDefaultPolicyFBEC9B6A": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NotificationWorkerLogs81C7AD23",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:ChangeMessageVisibility",
+                "sqs:GetQueueUrl",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingNotificationsQueue8FE33CAB",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "NotificationWorkerRoleDefaultPolicyFBEC9B6A",
+        "Roles": [
+          {
+            "Ref": "NotificationWorkerRole13675B8E"
+          }
+        ]
+      }
+    },
+    "NotificationWorkerFn7BCB2C39": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "notifications",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps"
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "NotificationWorkerLogs81C7AD23"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "NotificationWorkerRole13675B8E",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 30,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "NotificationWorkerRoleDefaultPolicyFBEC9B6A",
+        "NotificationWorkerRole13675B8E"
+      ]
+    },
+    "NotificationWorkerFnSqsEventSourceTestMessagingNotificationsQueue6748DC2795814A0E": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 10,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "MessagingNotificationsQueue8FE33CAB",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Ref": "NotificationWorkerFn7BCB2C39"
+        },
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures"
+        ],
+        "ScalingConfig": {
+          "MaximumConcurrency": 5
+        }
+      }
+    },
+    "ApiHttpApi4C294DC0": {
+      "Type": "AWS::ApiGatewayV2::Api",
+      "Properties": {
+        "Name": "HttpApi",
+        "ProtocolType": "HTTP"
+      }
+    },
+    "ApiHttpApiDefaultStageE708EF42": {
+      "Type": "AWS::ApiGatewayV2::Stage",
+      "Properties": {
+        "AccessLogSettings": {
+          "DestinationArn": {
+            "Fn::GetAtt": [
+              "ApiAccessLogs50B185DB",
+              "Arn"
+            ]
+          },
+          "Format": "{\\"requestId\\":\\"$context.requestId\\",\\"routeKey\\":\\"$context.routeKey\\",\\"status\\":\\"$context.status\\",\\"sub\\":\\"$context.authorizer.claims.sub\\",\\"ip\\":\\"$context.identity.sourceIp\\",\\"latencyMs\\":\\"$context.responseLatency\\",\\"integrationError\\":\\"$context.integrationErrorMessage\\",\\"authorizerError\\":\\"$context.authorizer.error\\"}"
+        },
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AutoDeploy": true,
+        "DefaultRouteSettings": {
+          "ThrottlingBurstLimit": 100,
+          "ThrottlingRateLimit": 50
+        },
+        "StageName": "$default"
+      }
+    },
+    "ApiHttpApiPOSTeventsFFFF3228": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "CreateEventFn7A5C2858",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiPOSTeventsPOSTeventsPermission1F6F4C43": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "CreateEventFn7A5C2858",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiPOSTeventsBA2F0BD1": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "POST /events",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiPOSTeventsFFFF3228"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiCognitoAuthorizerB58DB3E4": {
+      "Type": "AWS::ApiGatewayV2::Authorizer",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizerType": "JWT",
+        "IdentitySource": [
+          "$request.header.Authorization"
+        ],
+        "JwtConfiguration": {
+          "Audience": [
+            {
+              "Ref": "AuthUserPoolApiClient9CFE2E12"
+            }
+          ],
+          "Issuer": {
+            "Fn::Join": [
+              "",
+              [
+                "https://cognito-idp.",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ".amazonaws.com/",
+                {
+                  "Ref": "AuthUserPool8115E87F"
+                }
+              ]
+            ]
+          }
+        },
+        "Name": "CognitoAuthorizer"
+      }
+    },
+    "ApiHttpApiGETevents597A620E": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ListEventsFn77BDF55D",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiGETeventsGETeventsPermissionF996E080": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ListEventsFn77BDF55D",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiGETevents3EDD88C6": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "GET /events",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiGETevents597A620E"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiGETeventseventIdAEA1941D": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "GetEventFnDA25FC75",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiGETeventseventIdGETeventseventIdPermission49C9EC53": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "GetEventFnDA25FC75",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events/{eventId}"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiGETeventseventId832CA3B1": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "GET /events/{eventId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiGETeventseventIdAEA1941D"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdbookingsE0D95455": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "BookSeatsFnEBEF0FFD",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdbookingsPOSTeventseventIdbookingsPermissionF2CEF794": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "BookSeatsFnEBEF0FFD",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events/{eventId}/bookings"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdbookings26A9590A": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "POST /events/{eventId}/bookings",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiPOSTeventseventIdbookingsE0D95455"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiDELETEeventseventIdbookingsbookingId1717D1F2": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "CancelBookingFn220ED039",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiDELETEeventseventIdbookingsbookingIdDELETEeventseventIdbookingsbookingIdPermissionB48AC7C5": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "CancelBookingFn220ED039",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events/{eventId}/bookings/{bookingId}"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiDELETEeventseventIdbookingsbookingId00D99DAB": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "DELETE /events/{eventId}/bookings/{bookingId}",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiDELETEeventseventIdbookingsbookingId1717D1F2"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiGETmebookings43D10368": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "ListMyBookingsFn9EBE10D1",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiGETmebookingsGETmebookingsPermission75F899B8": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ListMyBookingsFn9EBE10D1",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/me/bookings"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiGETmebookings1E27AC83": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "GET /me/bookings",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiGETmebookings43D10368"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiAccessLogs50B185DB": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    }
+  },
+  "Outputs": {
+    "ApiUrl": {
+      "Value": {
+        "Fn::GetAtt": [
+          "ApiHttpApi4C294DC0",
+          "ApiEndpoint"
+        ]
+      }
+    },
+    "UserPoolId": {
+      "Value": {
+        "Ref": "AuthUserPool8115E87F"
+      }
+    },
+    "UserPoolClientId": {
+      "Value": {
+        "Ref": "AuthUserPoolApiClient9CFE2E12"
+      }
+    },
+    "DeadLetterQueueUrl": {
+      "Value": {
+        "Ref": "MessagingNotificationsDlq409CA652"
+      }
+    }
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Type": "AWS::SSM::Parameter::Value<String>",
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+    }
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5"
+                  ],
+                  {
+                    "Ref": "BootstrapVersion"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+        }
+      ]
+    }
+  }
+}"
+`;
