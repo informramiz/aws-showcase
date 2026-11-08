@@ -29,7 +29,7 @@ describe("BookingsStack", () => {
     const fns = Object.entries(template.findResources("AWS::Lambda::Function")).filter(
       ([id]) => !id.startsWith("BucketNotificationsHandler"),
     );
-    expect(fns).toHaveLength(9);
+    expect(fns).toHaveLength(11);
     for (const [, fn] of fns) {
       expect(fn["Properties"]).toMatchObject({
         Runtime: "nodejs24.x",
@@ -63,6 +63,25 @@ describe("BookingsStack", () => {
     });
     template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
       FunctionResponseTypes: ["ReportBatchItemFailures"],
+    });
+  });
+
+  it("projects stats from the table stream with filters, bisecting retries and an on-failure queue", () => {
+    template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
+      StreamSpecification: { StreamViewType: "NEW_AND_OLD_IMAGES" },
+    });
+    template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      StartingPosition: "TRIM_HORIZON",
+      BisectBatchOnFunctionError: true,
+      MaximumRetryAttempts: 5,
+      FunctionResponseTypes: ["ReportBatchItemFailures"],
+      FilterCriteria: {
+        Filters: [
+          { Pattern: JSON.stringify({ dynamodb: { Keys: { SK: { S: [{ prefix: "BOOKING#" }] } } } }) },
+          { Pattern: JSON.stringify({ dynamodb: { Keys: { SK: { S: [{ prefix: "WAITLIST#" }] } } } }) },
+        ],
+      },
+      DestinationConfig: { OnFailure: { Destination: Match.anyValue() } },
     });
   });
 
@@ -110,6 +129,7 @@ describe("BookingsStack", () => {
       "DELETE /events/{eventId}/bookings/{bookingId}",
       "GET /events",
       "GET /events/{eventId}",
+      "GET /events/{eventId}/stats",
       "GET /me/bookings",
       "POST /events",
       "POST /events/{eventId}/bookings",

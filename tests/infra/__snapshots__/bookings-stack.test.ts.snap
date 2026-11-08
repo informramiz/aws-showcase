@@ -67,7 +67,10 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
               "Ref": "AWS::Region"
             }
           }
-        ]
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        }
       },
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
@@ -329,6 +332,48 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         "Queues": [
           {
             "Ref": "MessagingNotificationsQueue8FE33CAB"
+          }
+        ]
+      }
+    },
+    "MessagingStreamFailuresQueue51D2469B": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "SqsManagedSseEnabled": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "MessagingStreamFailuresQueuePolicyEBA9A763": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingStreamFailuresQueue51D2469B",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Queues": [
+          {
+            "Ref": "MessagingStreamFailuresQueue51D2469B"
           }
         ]
       }
@@ -1736,6 +1781,366 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         "ProcessEventImageRole80C1EABE"
       ]
     },
+    "GetEventStatsLogs0CAE7CA4": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "GetEventStatsRoleF2BB1078": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "GetEventStatsRoleDefaultPolicy80129C75": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "GetEventStatsLogs0CAE7CA4",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "dynamodb:GetItem",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "GetEventStatsRoleDefaultPolicy80129C75",
+        "Roles": [
+          {
+            "Ref": "GetEventStatsRoleF2BB1078"
+          }
+        ]
+      }
+    },
+    "GetEventStatsFn7269C93D": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "reporting",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "GetEventStatsLogs0CAE7CA4"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "GetEventStatsRoleF2BB1078",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "GetEventStatsRoleDefaultPolicy80129C75",
+        "GetEventStatsRoleF2BB1078"
+      ]
+    },
+    "ProjectEventStatsLogs40B52A43": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "ProjectEventStatsRole7BC28916": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "ProjectEventStatsRoleDefaultPolicyB5F52B89": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ProjectEventStatsLogs40B52A43",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "dynamodb:UpdateItem",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "dynamodb:PutItem",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DataIdempotencyTable36C198C8",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingStreamFailuresQueue51D2469B",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "dynamodb:ListStreams",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DataTableFDBAD0F2",
+                  "StreamArn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "dynamodb:DescribeStream",
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DataTableFDBAD0F2",
+                  "StreamArn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "ProjectEventStatsRoleDefaultPolicyB5F52B89",
+        "Roles": [
+          {
+            "Ref": "ProjectEventStatsRole7BC28916"
+          }
+        ]
+      }
+    },
+    "ProjectEventStatsFn2F65D821": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "reporting",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            },
+            "IDEMPOTENCY_TABLE_NAME": {
+              "Ref": "DataIdempotencyTable36C198C8"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "ProjectEventStatsLogs40B52A43"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "ProjectEventStatsRole7BC28916",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "ProjectEventStatsRoleDefaultPolicyB5F52B89",
+        "ProjectEventStatsRole7BC28916"
+      ]
+    },
+    "ProjectEventStatsFnDynamoDBEventSourceTestDataTableDB6F8BC61F2DCBD5": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 25,
+        "BisectBatchOnFunctionError": true,
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "MessagingStreamFailuresQueue51D2469B",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "DataTableFDBAD0F2",
+            "StreamArn"
+          ]
+        },
+        "FilterCriteria": {
+          "Filters": [
+            {
+              "Pattern": "{\\"dynamodb\\":{\\"Keys\\":{\\"SK\\":{\\"S\\":[{\\"prefix\\":\\"BOOKING#\\"}]}}}}"
+            },
+            {
+              "Pattern": "{\\"dynamodb\\":{\\"Keys\\":{\\"SK\\":{\\"S\\":[{\\"prefix\\":\\"WAITLIST#\\"}]}}}}"
+            }
+          ]
+        },
+        "FunctionName": {
+          "Ref": "ProjectEventStatsFn2F65D821"
+        },
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures"
+        ],
+        "MaximumRetryAttempts": 5,
+        "StartingPosition": "TRIM_HORIZON"
+      }
+    },
     "NotificationWorkerLogs81C7AD23": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
@@ -2534,6 +2939,83 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         }
       }
     },
+    "ApiHttpApiGETeventseventIdstatsC1970C0F": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "GetEventStatsFn7269C93D",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiGETeventseventIdstatsGETeventseventIdstatsPermissionEFC96A11": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "GetEventStatsFn7269C93D",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events/{eventId}/stats"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiGETeventseventIdstatsB101ADDA": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "GET /events/{eventId}/stats",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiGETeventseventIdstatsC1970C0F"
+              }
+            ]
+          ]
+        }
+      }
+    },
     "ApiAccessLogs50B185DB": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
@@ -2565,6 +3047,11 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
     "DeadLetterQueueUrl": {
       "Value": {
         "Ref": "MessagingNotificationsDlq409CA652"
+      }
+    },
+    "StreamFailuresQueueUrl": {
+      "Value": {
+        "Ref": "MessagingStreamFailuresQueue51D2469B"
       }
     },
     "ImagesBucketName": {

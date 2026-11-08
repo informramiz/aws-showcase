@@ -1,6 +1,8 @@
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from "aws-cdk-lib";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
-import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import type { ITable } from "aws-cdk-lib/aws-dynamodb";
+import { FilterCriteria, FilterRule, type IFunction, StartingPosition } from "aws-cdk-lib/aws-lambda";
+import { DynamoEventSource, SqsDlq, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import type { Construct } from "constructs";
 import { Api } from "./constructs/api.js";
 import { AppFunction } from "./constructs/app-function.js";
@@ -9,6 +11,7 @@ import { Data } from "./constructs/data.js";
 import { Images } from "./constructs/images.js";
 import { Messaging } from "./constructs/messaging.js";
 import { applyNagSuppressions } from "./nag-suppressions.js";
+import { SK_PREFIX } from "../../src/shared/dynamodb/keys.js";
 
 export interface BookingsStackProps extends StackProps {
   /** DESTROY for a throwaway demo stack; RETAIN for anything holding real data. */
@@ -46,6 +49,11 @@ export class BookingsStack extends Stack {
     const imageEnv = { ...table, BUCKET_NAME: images.bucket.bucketName };
     const createImageUpload = fn("CreateImageUpload", "create-image-upload", "events", imageEnv);
     const processEventImage = fn("ProcessEventImage", "process-event-image", "images", imageEnv);
+    const getEventStats = fn("GetEventStats", "get-event-stats", "reporting");
+    const projectEventStats = fn("ProjectEventStats", "project-event-stats", "reporting", {
+      ...table,
+      IDEMPOTENCY_TABLE_NAME: data.idempotencyTable.tableName,
+    });
     const worker = new AppFunction(this, "NotificationWorker", {
       entry: "notification-worker",
       serviceName: "notifications",
@@ -68,6 +76,9 @@ export class BookingsStack extends Stack {
     data.table.grant(listMyBookings, "dynamodb:Query");
     data.table.grant(createImageUpload, "dynamodb:GetItem");
     data.table.grant(processEventImage, "dynamodb:UpdateItem");
+    data.table.grant(getEventStats, "dynamodb:GetItem");
+    data.table.grant(projectEventStats, "dynamodb:UpdateItem");
+    data.idempotencyTable.grant(projectEventStats, "dynamodb:PutItem");
     images.grantUpload(createImageUpload);
     images.onImageUploaded(processEventImage);
     data.idempotencyTable.grant(
@@ -84,6 +95,26 @@ export class BookingsStack extends Stack {
       new SqsEventSource(messaging.queue, { batchSize: 10, reportBatchItemFailures: true, maxConcurrency: 5 }),
     );
 
+    // DynamoDB Streams consumers. Event filters drop unrelated changes before Lambda is invoked (no
+    // cost for them); failed records are retried with bisecting, then parked in a queue for replay.
+    const consumeStream = (consumer: IFunction, filters: Record<string, unknown>[]) => {
+      consumer.addEventSource(
+        // TableV2 implements ITable at runtime; the cast only bridges the optional tableStreamArn typing
+        // under exactOptionalPropertyTypes (the stream is enabled in DataStore).
+        new DynamoEventSource(data.table as ITable, {
+          startingPosition: StartingPosition.TRIM_HORIZON,
+          batchSize: 25,
+          bisectBatchOnError: true,
+          retryAttempts: 5,
+          reportBatchItemFailures: true,
+          filters: filters.map((f) => FilterCriteria.filter(f)),
+          onFailure: new SqsDlq(messaging.streamFailures),
+        }),
+      );
+    };
+    const skStartsWith = (prefix: string) => ({ dynamodb: { Keys: { SK: { S: FilterRule.beginsWith(prefix) } } } });
+    consumeStream(projectEventStats, [skStartsWith(SK_PREFIX.booking), skStartsWith(SK_PREFIX.waitlist)]);
+
     const api = new Api(this, "Api", {
       userPool: auth.userPool,
       client: auth.client,
@@ -97,6 +128,7 @@ export class BookingsStack extends Stack {
         { method: HttpMethod.DELETE, path: "/events/{eventId}/bookings/{bookingId}", handler: cancelBooking },
         { method: HttpMethod.GET, path: "/me/bookings", handler: listMyBookings },
         { method: HttpMethod.POST, path: "/events/{eventId}/image-upload-url", handler: createImageUpload },
+        { method: HttpMethod.GET, path: "/events/{eventId}/stats", handler: getEventStats },
       ],
     });
 
@@ -104,6 +136,7 @@ export class BookingsStack extends Stack {
     new CfnOutput(this, "UserPoolId", { value: auth.userPool.userPoolId });
     new CfnOutput(this, "UserPoolClientId", { value: auth.client.userPoolClientId });
     new CfnOutput(this, "DeadLetterQueueUrl", { value: messaging.deadLetterQueue.queueUrl });
+    new CfnOutput(this, "StreamFailuresQueueUrl", { value: messaging.streamFailures.queueUrl });
     new CfnOutput(this, "ImagesBucketName", { value: images.bucket.bucketName });
 
     applyNagSuppressions(this, { table: data.table, bucket: images.bucket });

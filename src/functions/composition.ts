@@ -15,6 +15,9 @@ import { DynamoDbEventRepository } from "../features/events/adapters/dynamodb-ev
 import { S3ImageStore, S3ImageUploadSigner } from "../features/events/adapters/s3-image-storage.js";
 import { CreateImageUpload } from "../features/events/application/create-image-upload.js";
 import { ProcessUploadedImage } from "../features/events/application/process-uploaded-image.js";
+import { DynamoDbStatsRepository } from "../features/reporting/adapters/dynamodb-stats-repository.js";
+import { GetEventStats } from "../features/reporting/application/get-event-stats.js";
+import { ProjectEventStats } from "../features/reporting/application/project-event-stats.js";
 import { systemClock } from "../shared/clock.js";
 import { requireEnv } from "../shared/config.js";
 import { createDocumentClient } from "../shared/dynamodb/client.js";
@@ -37,6 +40,7 @@ export const compose = ({ logger, tracer, metrics }: Observability) => {
   const publisher = () =>
     new EventBridgeBookingPublisher(tracer.captureAWSv3Client(new EventBridgeClient({})), requireEnv("EVENT_BUS_NAME"));
 
+  const stats = () => new DynamoDbStatsRepository(doc, tableName(), requireEnv("IDEMPOTENCY_TABLE_NAME"), systemClock);
   const s3 = () => tracer.captureAWSv3Client(new S3Client({}));
 
   return {
@@ -56,5 +60,7 @@ export const compose = ({ logger, tracer, metrics }: Observability) => {
     },
     cancelBooking: () => new CancelBooking(bookings(), publisher(), telemetry, systemClock),
     listMyBookings: () => new ListMyBookings(bookings()),
+    getEventStats: () => new GetEventStats(events(), stats()),
+    projectEventStats: () => new ProjectEventStats(stats(), telemetry),
   };
 };

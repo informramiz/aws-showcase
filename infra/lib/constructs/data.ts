@@ -1,5 +1,5 @@
 import type { RemovalPolicy } from "aws-cdk-lib";
-import { AttributeType, Billing, TableV2 } from "aws-cdk-lib/aws-dynamodb";
+import { AttributeType, Billing, StreamViewType, TableV2 } from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
 
 export interface DataProps {
@@ -20,6 +20,9 @@ export class Data extends Construct {
       billing: Billing.onDemand(),
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: props.removalPolicy,
+      // Change data capture for the read models (stats), the waitlist workflow and reminders. Old and
+      // new images let consumers see status transitions, not just the latest state.
+      dynamoStream: StreamViewType.NEW_AND_OLD_IMAGES,
       globalSecondaryIndexes: [
         {
           indexName: "GSI1",

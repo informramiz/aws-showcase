@@ -20,6 +20,8 @@ export class Messaging extends Construct {
   readonly bus: EventBus;
   readonly queue: Queue;
   readonly deadLetterQueue: Queue;
+  /** On-failure destination for stream consumers: metadata of batches that ran out of retries. */
+  readonly streamFailures: Queue;
 
   constructor(scope: Construct, id: string, props: MessagingProps) {
     super(scope, id);
@@ -39,6 +41,13 @@ export class Messaging extends Construct {
       // AWS guidance: visibility timeout of at least 6x the function timeout for SQS event sources.
       visibilityTimeout: Duration.seconds(props.workerTimeout.toSeconds() * 6),
       deadLetterQueue: { queue: this.deadLetterQueue, maxReceiveCount: 3 },
+      removalPolicy: props.removalPolicy,
+    });
+
+    this.streamFailures = new Queue(this, "StreamFailuresQueue", {
+      encryption: QueueEncryption.SQS_MANAGED,
+      enforceSSL: true,
+      retentionPeriod: Duration.days(14),
       removalPolicy: props.removalPolicy,
     });
 

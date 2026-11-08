@@ -42,6 +42,11 @@ export const applyNagSuppressions = (stack: Stack, { table, bucket }: NagTargets
         "Only the CDK-managed BucketNotificationsHandler (a deploy-time custom resource that wires the S3 notification) uses the AWS managed basic execution policy; app functions use their own scoped roles.",
     },
     {
+      id: "AwsSolutions-SQS3",
+      reason:
+        "Only the StreamFailuresQueue lacks a DLQ: it is itself the terminal on-failure destination for the DynamoDB stream consumers (it holds batch metadata for replay), so it has nothing further to dead-letter to.",
+    },
+    {
       id: "AwsSolutions-COG2",
       reason:
         "Demo API: required MFA would block the scripted sign-in in the README. A production pool should set mfa: Mfa.REQUIRED.",

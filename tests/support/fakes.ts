@@ -11,6 +11,8 @@ import type {
 import { type Booking, BookingErrors } from "../../src/features/bookings/domain/booking.js";
 import type { BookingRepository } from "../../src/features/bookings/domain/booking-repository.js";
 import type { BookingEvent, BookingEventPublisher } from "../../src/features/bookings/domain/booking-events.js";
+import { emptyStats, type EventStats, type StatsDelta } from "../../src/features/reporting/domain/event-stats.js";
+import type { ApplyResult, StatsRepository } from "../../src/features/reporting/domain/stats-repository.js";
 
 const paginate = <T>(all: T[], page: PageRequest): Page<T> => {
   const start = page.cursor === undefined ? 0 : Number(page.cursor);
@@ -124,5 +126,24 @@ export class RecordingPublisher implements BookingEventPublisher {
     if (this.failWith !== undefined) return Promise.reject(this.failWith);
     this.published.push(event);
     return Promise.resolve();
+  }
+}
+
+/** Stats store fake with the same exactly-once-per-change contract as the DynamoDB adapter. */
+export class InMemoryStatsRepository implements StatsRepository {
+  readonly stats = new Map<string, EventStats>();
+  readonly seen = new Set<string>();
+
+  apply(changeId: string, eventId: string, delta: StatsDelta, at: string): Promise<ApplyResult> {
+    if (this.seen.has(changeId)) return Promise.resolve("duplicate");
+    this.seen.add(changeId);
+    const current: Record<string, unknown> = { ...(this.stats.get(eventId) ?? emptyStats(eventId)), updatedAt: at };
+    for (const [counter, value] of Object.entries(delta)) current[counter] = (current[counter] as number) + value;
+    this.stats.set(eventId, current as EventStats);
+    return Promise.resolve("applied");
+  }
+
+  get(eventId: string): Promise<EventStats | undefined> {
+    return Promise.resolve(this.stats.get(eventId));
   }
 }
