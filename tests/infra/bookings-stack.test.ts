@@ -24,10 +24,13 @@ describe("BookingsStack", () => {
     template = Template.fromStack(new BookingsStack(newApp(), "Test"));
   });
 
-  it("runs every function on Node 24 arm64 with X-Ray tracing", () => {
-    template.resourceCountIs("AWS::Lambda::Function", 7);
-    const fns = template.findResources("AWS::Lambda::Function");
-    for (const fn of Object.values(fns)) {
+  it("runs every app function on Node 24 arm64 with X-Ray tracing", () => {
+    // The only other function is CDK's own deploy-time handler that wires the S3 notification.
+    const fns = Object.entries(template.findResources("AWS::Lambda::Function")).filter(
+      ([id]) => !id.startsWith("BucketNotificationsHandler"),
+    );
+    expect(fns).toHaveLength(9);
+    for (const [, fn] of fns) {
       expect(fn["Properties"]).toMatchObject({
         Runtime: "nodejs24.x",
         Architectures: ["arm64"],
@@ -63,6 +66,43 @@ describe("BookingsStack", () => {
     });
   });
 
+  it("keeps event images in a private, encrypted bucket that triggers validation on upload", () => {
+    template.hasResourceProperties("AWS::S3::Bucket", {
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        BlockPublicPolicy: true,
+        IgnorePublicAcls: true,
+        RestrictPublicBuckets: true,
+      },
+      BucketEncryption: {
+        ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: "AES256" } }],
+      },
+      LifecycleConfiguration: {
+        Rules: Match.arrayWith([
+          Match.objectLike({ AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 } }),
+          Match.objectLike({ Prefix: "events/", ExpirationInDays: 400 }),
+        ]),
+      },
+    });
+    template.hasResourceProperties("AWS::S3::BucketPolicy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({ Effect: "Deny", Condition: { Bool: { "aws:SecureTransport": "false" } } }),
+        ]),
+      },
+    });
+    template.hasResourceProperties("Custom::S3BucketNotifications", {
+      NotificationConfiguration: {
+        LambdaFunctionConfigurations: [
+          Match.objectLike({
+            Events: ["s3:ObjectCreated:*"],
+            Filter: { Key: { FilterRules: [{ Name: "prefix", Value: "events/" }] } },
+          }),
+        ],
+      },
+    });
+  });
+
   it("protects every route with the Cognito JWT authorizer", () => {
     template.hasResourceProperties("AWS::ApiGatewayV2::Authorizer", { AuthorizerType: "JWT" });
     const routes = Object.values(template.findResources("AWS::ApiGatewayV2::Route") as Record<string, Route>);
@@ -73,6 +113,7 @@ describe("BookingsStack", () => {
       "GET /me/bookings",
       "POST /events",
       "POST /events/{eventId}/bookings",
+      "POST /events/{eventId}/image-upload-url",
     ]);
     for (const route of routes) expect(route.Properties.AuthorizationType).toBe("JWT");
   });

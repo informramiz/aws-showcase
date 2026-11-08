@@ -1,9 +1,17 @@
-import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
+import {
+  type DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { decodeCursor, encodeCursor } from "../../../shared/dynamodb/cursor.js";
 import { GSI1, GSI1_KEY_ATTRS, Keys } from "../../../shared/dynamodb/keys.js";
 import type { Page, PageRequest } from "../../../shared/page.js";
 import type { Event } from "../domain/event.js";
-import type { EventRepository } from "../domain/event-repository.js";
+import type { EventImage } from "../domain/event-image.js";
+import type { AttachImageResult, EventRepository } from "../domain/event-repository.js";
 
 export interface EventItem extends Event {
   readonly PK: string;
@@ -31,6 +39,7 @@ export const fromEventItem = (item: Record<string, unknown>): Event => {
     seatsRemaining: e.seatsRemaining,
     organizerId: e.organizerId,
     createdAt: e.createdAt,
+    ...(e.image === undefined ? {} : { image: e.image }),
   };
 };
 
@@ -71,5 +80,28 @@ export class DynamoDbEventRepository implements EventRepository {
     );
     const nextCursor = encodeCursor(LastEvaluatedKey);
     return { items: Items.map(fromEventItem), ...(nextCursor === undefined ? {} : { nextCursor }) };
+  }
+
+  async attachImage(eventId: string, image: EventImage): Promise<AttachImageResult> {
+    try {
+      const { Attributes } = await this.db.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: Keys.event(eventId),
+          UpdateExpression: "SET #image = :image",
+          ConditionExpression: "attribute_exists(PK) AND (attribute_not_exists(#image) OR #image.uploadedAt <= :at)",
+          ExpressionAttributeNames: { "#image": "image" },
+          ExpressionAttributeValues: { ":image": image, ":at": image.uploadedAt },
+          ReturnValues: "UPDATED_OLD",
+          // An item in the failure tells "a newer image is already there" from "no such event".
+          ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+        }),
+      );
+      const replaced = Attributes?.["image"] as EventImage | undefined;
+      return { status: "attached", ...(replaced === undefined ? {} : { replaced }) };
+    } catch (error) {
+      if (!(error instanceof ConditionalCheckFailedException)) throw error;
+      return error.Item === undefined ? { status: "event_not_found" } : { status: "stale" };
+    }
   }
 }

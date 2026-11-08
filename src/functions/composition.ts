@@ -1,6 +1,7 @@
 import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import { DynamoDBPersistenceLayer } from "@aws-lambda-powertools/idempotency/dynamodb";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { S3Client } from "@aws-sdk/client-s3";
 import { BookSeats } from "../features/bookings/application/book-seats.js";
 import { CancelBooking } from "../features/bookings/application/cancel-booking.js";
 import { ListMyBookings } from "../features/bookings/application/list-my-bookings.js";
@@ -11,6 +12,9 @@ import {
   makeIdempotentBookSeats,
 } from "../features/bookings/adapters/idempotent-book-seats.js";
 import { DynamoDbEventRepository } from "../features/events/adapters/dynamodb-event-repository.js";
+import { S3ImageStore, S3ImageUploadSigner } from "../features/events/adapters/s3-image-storage.js";
+import { CreateImageUpload } from "../features/events/application/create-image-upload.js";
+import { ProcessUploadedImage } from "../features/events/application/process-uploaded-image.js";
 import { systemClock } from "../shared/clock.js";
 import { requireEnv } from "../shared/config.js";
 import { createDocumentClient } from "../shared/dynamodb/client.js";
@@ -33,8 +37,14 @@ export const compose = ({ logger, tracer, metrics }: Observability) => {
   const publisher = () =>
     new EventBridgeBookingPublisher(tracer.captureAWSv3Client(new EventBridgeClient({})), requireEnv("EVENT_BUS_NAME"));
 
+  const s3 = () => tracer.captureAWSv3Client(new S3Client({}));
+
   return {
     events,
+    createImageUpload: () =>
+      new CreateImageUpload(events(), new S3ImageUploadSigner(s3(), requireEnv("BUCKET_NAME")), uuidGenerator),
+    processUploadedImage: () =>
+      new ProcessUploadedImage(events(), new S3ImageStore(s3(), requireEnv("BUCKET_NAME")), telemetry),
     bookSeatsOnce: () => {
       const config = createIdempotencyConfig();
       const store = new DynamoDBPersistenceLayer({

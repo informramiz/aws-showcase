@@ -1,7 +1,13 @@
 import { ConflictError, NotFoundError } from "../../src/shared/errors.js";
 import type { Page, PageRequest } from "../../src/shared/page.js";
 import type { Event } from "../../src/features/events/domain/event.js";
-import type { EventRepository } from "../../src/features/events/domain/event-repository.js";
+import type { AttachImageResult, EventRepository } from "../../src/features/events/domain/event-repository.js";
+import type { EventImage } from "../../src/features/events/domain/event-image.js";
+import type {
+  ImageStore,
+  ImageUploadSigner,
+  UploadUrlRequest,
+} from "../../src/features/events/domain/image-storage.js";
 import { type Booking, BookingErrors } from "../../src/features/bookings/domain/booking.js";
 import type { BookingRepository } from "../../src/features/bookings/domain/booking-repository.js";
 import type { BookingEvent, BookingEventPublisher } from "../../src/features/bookings/domain/booking-events.js";
@@ -32,6 +38,38 @@ export class InMemoryEventRepository implements EventRepository {
       .filter((e) => Date.parse(e.startsAt) >= from.getTime())
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     return Promise.resolve(paginate(upcoming, page));
+  }
+
+  attachImage(eventId: string, image: EventImage): Promise<AttachImageResult> {
+    const event = this.events.get(eventId);
+    if (event === undefined) return Promise.resolve({ status: "event_not_found" });
+    const replaced = event.image;
+    if (replaced !== undefined && replaced.uploadedAt > image.uploadedAt) return Promise.resolve({ status: "stale" });
+    this.events.set(eventId, { ...event, image });
+    return Promise.resolve({ status: "attached", ...(replaced === undefined ? {} : { replaced }) });
+  }
+}
+
+/** Object store fake: keys map to their bytes. */
+export class InMemoryImageStore implements ImageStore {
+  readonly objects = new Map<string, Uint8Array>();
+
+  readHeader(key: string, bytes: number): Promise<Uint8Array | undefined> {
+    return Promise.resolve(this.objects.get(key)?.slice(0, bytes));
+  }
+
+  delete(key: string): Promise<void> {
+    this.objects.delete(key);
+    return Promise.resolve();
+  }
+}
+
+export class RecordingSigner implements ImageUploadSigner {
+  readonly requests: UploadUrlRequest[] = [];
+
+  presignPut(request: UploadUrlRequest): Promise<string> {
+    this.requests.push(request);
+    return Promise.resolve(`https://bucket.s3.amazonaws.com/${request.key}?X-Amz-Signature=sig`);
   }
 }
 

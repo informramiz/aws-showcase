@@ -6,6 +6,7 @@ import { Api } from "./constructs/api.js";
 import { AppFunction } from "./constructs/app-function.js";
 import { Auth } from "./constructs/auth.js";
 import { Data } from "./constructs/data.js";
+import { Images } from "./constructs/images.js";
 import { Messaging } from "./constructs/messaging.js";
 import { applyNagSuppressions } from "./nag-suppressions.js";
 
@@ -23,6 +24,7 @@ export class BookingsStack extends Stack {
     const auth = new Auth(this, "Auth", { removalPolicy });
     const workerTimeout = Duration.seconds(30);
     const messaging = new Messaging(this, "Messaging", { removalPolicy, workerTimeout });
+    const images = new Images(this, "Images", { removalPolicy });
 
     const table = { TABLE_NAME: data.table.tableName };
     const fn = (id: string, entry: string, serviceName: string, environment: Record<string, string> = table) =>
@@ -41,6 +43,9 @@ export class BookingsStack extends Stack {
       EVENT_BUS_NAME: messaging.bus.eventBusName,
     });
     const listMyBookings = fn("ListMyBookings", "list-my-bookings", "bookings");
+    const imageEnv = { ...table, BUCKET_NAME: images.bucket.bucketName };
+    const createImageUpload = fn("CreateImageUpload", "create-image-upload", "events", imageEnv);
+    const processEventImage = fn("ProcessEventImage", "process-event-image", "images", imageEnv);
     const worker = new AppFunction(this, "NotificationWorker", {
       entry: "notification-worker",
       serviceName: "notifications",
@@ -61,6 +66,10 @@ export class BookingsStack extends Stack {
     );
     data.table.grant(cancelBooking, "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem");
     data.table.grant(listMyBookings, "dynamodb:Query");
+    data.table.grant(createImageUpload, "dynamodb:GetItem");
+    data.table.grant(processEventImage, "dynamodb:UpdateItem");
+    images.grantUpload(createImageUpload);
+    images.onImageUploaded(processEventImage);
     data.idempotencyTable.grant(
       bookSeats,
       "dynamodb:GetItem",
@@ -87,6 +96,7 @@ export class BookingsStack extends Stack {
         { method: HttpMethod.POST, path: "/events/{eventId}/bookings", handler: bookSeats },
         { method: HttpMethod.DELETE, path: "/events/{eventId}/bookings/{bookingId}", handler: cancelBooking },
         { method: HttpMethod.GET, path: "/me/bookings", handler: listMyBookings },
+        { method: HttpMethod.POST, path: "/events/{eventId}/image-upload-url", handler: createImageUpload },
       ],
     });
 
@@ -94,7 +104,8 @@ export class BookingsStack extends Stack {
     new CfnOutput(this, "UserPoolId", { value: auth.userPool.userPoolId });
     new CfnOutput(this, "UserPoolClientId", { value: auth.client.userPoolClientId });
     new CfnOutput(this, "DeadLetterQueueUrl", { value: messaging.deadLetterQueue.queueUrl });
+    new CfnOutput(this, "ImagesBucketName", { value: images.bucket.bucketName });
 
-    applyNagSuppressions(this, data.table);
+    applyNagSuppressions(this, { table: data.table, bucket: images.bucket });
   }
 }

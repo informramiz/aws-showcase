@@ -38,4 +38,23 @@ describe("DynamoDbEventRepository (DynamoDB Local)", () => {
     expect(first.items.map((e) => e.id)).toEqual(["a", "b"]);
     expect(second.items.map((e) => e.id)).toEqual(["c"]);
   });
+
+  it("attaches an image, keeps the newest one and reports what it replaced", async () => {
+    const event = anEvent({ id: "e-image" });
+    await repo.create(event);
+    const first = {
+      key: "events/e/1.png",
+      contentType: "image/png",
+      size: 10,
+      uploadedAt: "2030-01-01T00:00:00.000Z",
+    } as const;
+    const second = { ...first, key: "events/e/2.png", uploadedAt: "2030-01-02T00:00:00.000Z" };
+
+    expect(await repo.attachImage(event.id, first)).toEqual({ status: "attached" });
+    expect(await repo.attachImage(event.id, second)).toEqual({ status: "attached", replaced: first });
+    expect(await repo.attachImage(event.id, first)).toEqual({ status: "stale" });
+    expect(await repo.attachImage(event.id, second)).toEqual({ status: "attached", replaced: second });
+    expect(await repo.attachImage("missing", first)).toEqual({ status: "event_not_found" });
+    expect((await repo.findById(event.id))?.image).toEqual(second);
+  });
 });

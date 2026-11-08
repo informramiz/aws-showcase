@@ -1,4 +1,6 @@
-import { BusinessRuleError } from "../../../shared/errors.js";
+import { type Actor, hasRole, Role } from "../../../shared/actor.js";
+import { BusinessRuleError, ForbiddenError } from "../../../shared/errors.js";
+import type { EventImage } from "./event-image.js";
 
 export const MAX_CAPACITY = 10_000;
 
@@ -12,6 +14,7 @@ export interface Event {
   readonly seatsRemaining: number;
   readonly organizerId: string;
   readonly createdAt: string;
+  readonly image?: EventImage;
 }
 
 export interface NewEventInput {
@@ -43,3 +46,10 @@ export const createEvent = (input: NewEventInput): Event => {
 
 export const hasStarted = (event: Pick<Event, "startsAt">, now: Date): boolean =>
   Date.parse(event.startsAt) <= now.getTime();
+
+/** Only the organizer who created an event may manage it (upload images, read stats). */
+export const assertManagedBy = (event: Pick<Event, "organizerId">, actor: Actor): void => {
+  if (!hasRole(actor, Role.Organizer) || event.organizerId !== actor.userId) {
+    throw new ForbiddenError("NOT_EVENT_ORGANIZER", "Only the event's organizer can do this");
+  }
+};

@@ -63,6 +63,7 @@ describe("booking use cases", () => {
           findById: () => Promise.resolve(event),
           create: () => Promise.resolve(),
           listUpcoming: () => Promise.resolve({ items: [] }),
+          attachImage: () => Promise.resolve({ status: "event_not_found" }),
         },
         bookings,
         publisher,
