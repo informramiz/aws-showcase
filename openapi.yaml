@@ -3,7 +3,9 @@ info:
   title: Bookings API
   version: 0.1.0
   description: |
-    Organizers publish events with a fixed number of seats. Attendees book and cancel seats.
+    Organizers publish events with a fixed number of seats, upload an image and read live stats.
+    Attendees book and cancel seats, and join a waitlist when an event is sold out: a freed seat is
+    offered to the next person, who has a limited time to accept it.
     Every route needs a Cognito access token (`Authorization: Bearer <token>`). Roles come from the
     `organizers` and `attendees` Cognito groups. Errors use RFC 9457 problem details.
 servers:
@@ -141,6 +143,112 @@ paths:
         "409": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/Problem" }
 
+  /events/{eventId}/image-upload-url:
+    post:
+      summary: Get a presigned S3 URL to upload the event image (the event's organizer only)
+      description: |
+        Upload with a PUT to `uploadUrl`, sending the returned `headers` unchanged (they are signed).
+        After the upload, S3 triggers a function that checks the file's magic bytes and attaches the
+        image to the event; an object that is not the declared image type is deleted.
+      operationId: createImageUpload
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [contentType, contentLength]
+              properties:
+                contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+                contentLength: { type: integer, minimum: 1, maximum: 5242880 }
+      responses:
+        "201":
+          description: A short-lived upload URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImageUpload" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+
+  /events/{eventId}/stats:
+    get:
+      summary: Booking and waitlist counters (the event's organizer only)
+      description: Eventually consistent. Projected from the table's change stream, usually within a second.
+      operationId: getEventStats
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: The counters
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventStats" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+
+  /events/{eventId}/waitlist:
+    post:
+      summary: Join the waitlist of a sold-out event (attendees only)
+      description: |
+        When a booking is cancelled, each freed seat is offered to the next person in join order. The
+        offer is announced as a `WaitlistSeatOffered` notification and is held for 15 minutes; after
+        that it moves to the next person.
+      operationId: joinWaitlist
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "201":
+          description: On the waitlist
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WaitlistEntry" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409":
+          description: "`SEATS_AVAILABLE` (book instead), `ALREADY_WAITLISTED` or `ALREADY_BOOKED`"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: "`EVENT_STARTED`"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /events/{eventId}/waitlist/accept:
+    post:
+      summary: Accept your open seat offer, which books one seat
+      operationId: acceptWaitlistOffer
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "201":
+          description: The new booking (one seat)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Booking" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`NO_OFFER`"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "`OFFER_EXPIRED`"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
   /me/bookings:
     get:
       summary: List the caller's bookings, newest first
@@ -212,6 +320,49 @@ components:
         seatsRemaining: { type: integer, minimum: 0 }
         organizerId: { type: string }
         createdAt: { type: string, format: date-time }
+        image:
+          type: [object, "null"]
+          required: [key, contentType, size, uploadedAt]
+          properties:
+            key: { type: string }
+            contentType: { type: string }
+            size: { type: integer }
+            uploadedAt: { type: string, format: date-time }
+    ImageUpload:
+      type: object
+      required: [uploadUrl, method, headers, key, expiresIn]
+      properties:
+        uploadUrl: { type: string, format: uri }
+        method: { type: string, enum: [PUT] }
+        headers: { type: object, additionalProperties: { type: string } }
+        key: { type: string }
+        expiresIn: { type: integer, description: Seconds until the URL expires. }
+    EventStats:
+      type: object
+      required: [eventId, bookingsConfirmed, bookingsCancelled, seatsBooked, waitlist, updatedAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        bookingsConfirmed: { type: integer }
+        bookingsCancelled: { type: integer }
+        seatsBooked: { type: integer }
+        waitlist:
+          type: object
+          required: [joined, waiting, offersMade, offersAccepted, offersExpired]
+          properties:
+            joined: { type: integer }
+            waiting: { type: integer }
+            offersMade: { type: integer }
+            offersAccepted: { type: integer }
+            offersExpired: { type: integer }
+        updatedAt: { type: [string, "null"], format: date-time }
+    WaitlistEntry:
+      type: object
+      required: [eventId, status, joinedAt, offerExpiresAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        status: { type: string, enum: [WAITING, OFFERED, ACCEPTED, EXPIRED] }
+        joinedAt: { type: string, format: date-time }
+        offerExpiresAt: { type: [string, "null"], format: date-time }
     EventPage:
       type: object
       required: [items, nextCursor]
