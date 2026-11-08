@@ -1,11 +1,10 @@
+import type { EventPublisher, IntegrationEvent } from "../../../shared/events/integration-event.js";
 import type { Booking } from "./booking.js";
-
-export const BOOKING_EVENT_SOURCE = "bookings-api";
 
 export type BookingEventType = "BookingConfirmed" | "BookingCancelled";
 
 /** Integration event published after a booking change commits. Carries IDs and facts, no PII. */
-export interface BookingEvent {
+export interface BookingEvent extends IntegrationEvent {
   readonly type: BookingEventType;
   readonly bookingId: string;
   readonly eventId: string;
@@ -23,6 +22,4 @@ export const bookingEvent = (type: BookingEventType, booking: Booking, occurredA
   occurredAt: occurredAt.toISOString(),
 });
 
-export interface BookingEventPublisher {
-  publish(event: BookingEvent): Promise<void>;
-}
+export type BookingEventPublisher = EventPublisher<BookingEvent>;

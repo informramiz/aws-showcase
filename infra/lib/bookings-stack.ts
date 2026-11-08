@@ -10,8 +10,13 @@ import { Auth } from "./constructs/auth.js";
 import { Data } from "./constructs/data.js";
 import { Images } from "./constructs/images.js";
 import { Messaging } from "./constructs/messaging.js";
+import { Reminders } from "./constructs/reminders.js";
+import { WaitlistWorkflow } from "./constructs/waitlist-workflow.js";
 import { applyNagSuppressions } from "./nag-suppressions.js";
-import { SK_PREFIX } from "../../src/shared/dynamodb/keys.js";
+import { EVENT_META_SK, SK_PREFIX } from "../../src/shared/dynamodb/keys.js";
+
+/** How long a waitlisted person has to accept a freed seat before it moves to the next person. */
+const WAITLIST_HOLD = Duration.minutes(15);
 
 export interface BookingsStackProps extends StackProps {
   /** DESTROY for a throwaway demo stack; RETAIN for anything holding real data. */
@@ -54,6 +59,18 @@ export class BookingsStack extends Stack {
       ...table,
       IDEMPOTENCY_TABLE_NAME: data.idempotencyTable.tableName,
     });
+    const bus = { ...table, EVENT_BUS_NAME: messaging.bus.eventBusName };
+    const joinWaitlist = fn("JoinWaitlist", "join-waitlist", "waitlist");
+    const acceptOffer = fn("AcceptWaitlistOffer", "accept-waitlist-offer", "waitlist", bus);
+    const offerSeat = fn("OfferWaitlistSeat", "offer-waitlist-seat", "waitlist", {
+      ...bus,
+      HOLD_SECONDS: String(WAITLIST_HOLD.toSeconds()),
+    });
+    const resolveOffer = fn("ResolveWaitlistOffer", "resolve-waitlist-offer", "waitlist");
+    const sendReminders = fn("SendEventReminders", "send-event-reminders", "reminders", bus);
+    const tableTriggers = fn("TableChangeTriggers", "table-change-triggers", "triggers");
+    const workflow = new WaitlistWorkflow(this, "WaitlistWorkflow", { offerSeat, resolveOffer, removalPolicy });
+    const reminders = new Reminders(this, "Reminders", { target: sendReminders, removalPolicy });
     const worker = new AppFunction(this, "NotificationWorker", {
       entry: "notification-worker",
       serviceName: "notifications",
@@ -79,6 +96,11 @@ export class BookingsStack extends Stack {
     data.table.grant(getEventStats, "dynamodb:GetItem");
     data.table.grant(projectEventStats, "dynamodb:UpdateItem");
     data.idempotencyTable.grant(projectEventStats, "dynamodb:PutItem");
+    data.table.grant(joinWaitlist, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:ConditionCheckItem");
+    data.table.grant(acceptOffer, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem");
+    data.table.grant(offerSeat, "dynamodb:Query", "dynamodb:UpdateItem");
+    data.table.grant(resolveOffer, "dynamodb:GetItem", "dynamodb:UpdateItem");
+    data.table.grant(sendReminders, "dynamodb:GetItem", "dynamodb:Query");
     images.grantUpload(createImageUpload);
     images.onImageUploaded(processEventImage);
     data.idempotencyTable.grant(
@@ -90,6 +112,10 @@ export class BookingsStack extends Stack {
     );
     messaging.bus.grantPutEventsTo(bookSeats);
     messaging.bus.grantPutEventsTo(cancelBooking);
+    for (const publisher of [acceptOffer, offerSeat, sendReminders]) messaging.bus.grantPutEventsTo(publisher);
+    workflow.stateMachine.grantStartExecution(tableTriggers);
+    tableTriggers.addEnvironment("STATE_MACHINE_ARN", workflow.stateMachine.stateMachineArn);
+    reminders.grantCreateReminders(tableTriggers);
 
     worker.addEventSource(
       new SqsEventSource(messaging.queue, { batchSize: 10, reportBatchItemFailures: true, maxConcurrency: 5 }),
@@ -114,6 +140,19 @@ export class BookingsStack extends Stack {
     };
     const skStartsWith = (prefix: string) => ({ dynamodb: { Keys: { SK: { S: FilterRule.beginsWith(prefix) } } } });
     consumeStream(projectEventStats, [skStartsWith(SK_PREFIX.booking), skStartsWith(SK_PREFIX.waitlist)]);
+    // Second (and last allowed) consumer: a confirmed booking turning cancelled starts the waitlist
+    // workflow; a new event schedules its reminder.
+    consumeStream(tableTriggers, [
+      {
+        eventName: ["MODIFY"],
+        dynamodb: {
+          Keys: { SK: { S: FilterRule.beginsWith(SK_PREFIX.booking) } },
+          OldImage: { status: { S: ["CONFIRMED"] } },
+          NewImage: { status: { S: ["CANCELLED"] } },
+        },
+      },
+      { eventName: ["INSERT"], dynamodb: { Keys: { SK: { S: [EVENT_META_SK] } } } },
+    ]);
 
     const api = new Api(this, "Api", {
       userPool: auth.userPool,
@@ -129,6 +168,8 @@ export class BookingsStack extends Stack {
         { method: HttpMethod.GET, path: "/me/bookings", handler: listMyBookings },
         { method: HttpMethod.POST, path: "/events/{eventId}/image-upload-url", handler: createImageUpload },
         { method: HttpMethod.GET, path: "/events/{eventId}/stats", handler: getEventStats },
+        { method: HttpMethod.POST, path: "/events/{eventId}/waitlist", handler: joinWaitlist },
+        { method: HttpMethod.POST, path: "/events/{eventId}/waitlist/accept", handler: acceptOffer },
       ],
     });
 
@@ -137,8 +178,14 @@ export class BookingsStack extends Stack {
     new CfnOutput(this, "UserPoolClientId", { value: auth.client.userPoolClientId });
     new CfnOutput(this, "DeadLetterQueueUrl", { value: messaging.deadLetterQueue.queueUrl });
     new CfnOutput(this, "StreamFailuresQueueUrl", { value: messaging.streamFailures.queueUrl });
+    new CfnOutput(this, "WaitlistStateMachineArn", { value: workflow.stateMachine.stateMachineArn });
+    new CfnOutput(this, "RemindersDeadLetterQueueUrl", { value: reminders.deadLetterQueue.queueUrl });
     new CfnOutput(this, "ImagesBucketName", { value: images.bucket.bucketName });
 
-    applyNagSuppressions(this, { table: data.table, bucket: images.bucket });
+    applyNagSuppressions(this, {
+      table: data.table,
+      bucket: images.bucket,
+      workflowTasks: [offerSeat, resolveOffer],
+    });
   }
 }

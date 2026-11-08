@@ -1,10 +1,14 @@
 import { type Stack, Validations } from "aws-cdk-lib";
 import type { CfnTable, TableV2 } from "aws-cdk-lib/aws-dynamodb";
+import type { CfnFunction, Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import type { Bucket, CfnBucket } from "aws-cdk-lib/aws-s3";
+import { REMINDER_SCHEDULE_GROUP, REMINDER_SCHEDULE_PREFIX } from "./constructs/reminders.js";
 
 export interface NagTargets {
   readonly table: TableV2;
   readonly bucket: Bucket;
+  /** Functions the waitlist state machine invokes. */
+  readonly workflowTasks: readonly LambdaFunction[];
 }
 
 /**
@@ -12,10 +16,21 @@ export interface NagTargets {
  * (for IAM5, the exact resource), so a new wildcard or a new rule still fails synth until it is
  * fixed or justified in review.
  */
-export const applyNagSuppressions = (stack: Stack, { table, bucket }: NagTargets): void => {
+export const applyNagSuppressions = (stack: Stack, { table, bucket, workflowTasks }: NagTargets): void => {
   const tableLogicalId = stack.getLogicalId(table.node.defaultChild as CfnTable);
   const bucketLogicalId = stack.getLogicalId(bucket.node.defaultChild as CfnBucket);
+  const workflowTaskAcks = workflowTasks.map((fn) => ({
+    id: `AwsSolutions-IAM5[Resource::<${stack.getLogicalId(fn.node.defaultChild as CfnFunction)}.Arn>:*]`,
+    reason:
+      "The Step Functions LambdaInvoke task grants lambda:InvokeFunction on the function and its versions/aliases (arn:*). Scoped to this one function.",
+  }));
   const acks = [
+    ...workflowTaskAcks,
+    {
+      id: `AwsSolutions-IAM5[Resource::arn:<AWS::Partition>:scheduler:<AWS::Region>:<AWS::AccountId>:schedule/${REMINDER_SCHEDULE_GROUP}/${REMINDER_SCHEDULE_PREFIX}*]`,
+      reason:
+        "Reminder schedules are created at runtime, one per event (reminder-<eventId>), so CreateSchedule is scoped to that name prefix in the one reminders schedule group.",
+    },
     {
       id: "AwsSolutions-IAM5[Resource::*]",
       reason:

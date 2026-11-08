@@ -4,7 +4,7 @@ import type { Telemetry } from "../../../shared/telemetry.js";
 import { type Booking, BookingErrors, cancelBooking } from "../domain/booking.js";
 import { bookingEvent, type BookingEventPublisher } from "../domain/booking-events.js";
 import type { BookingRepository } from "../domain/booking-repository.js";
-import { publishSafely } from "./publish-safely.js";
+import { publishSafely } from "../../../shared/events/publish-safely.js";
 
 export class CancelBooking {
   constructor(

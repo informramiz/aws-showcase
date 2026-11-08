@@ -4,7 +4,8 @@ import { EventBus, Rule } from "aws-cdk-lib/aws-events";
 import { SqsQueue } from "aws-cdk-lib/aws-events-targets";
 import { Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
-import { BOOKING_EVENT_SOURCE } from "../../../src/features/bookings/domain/booking-events.js";
+import { NOTIFICATION_TYPES } from "../../../src/features/notifications/domain/notifier.js";
+import { EVENT_SOURCE } from "../../../src/shared/events/integration-event.js";
 
 export interface MessagingProps {
   readonly removalPolicy: RemovalPolicy;
@@ -53,7 +54,7 @@ export class Messaging extends Construct {
 
     new Rule(this, "BookingEventsRule", {
       eventBus: this.bus,
-      eventPattern: { source: [BOOKING_EVENT_SOURCE], detailType: ["BookingConfirmed", "BookingCancelled"] },
+      eventPattern: { source: [EVENT_SOURCE], detailType: [...NOTIFICATION_TYPES] },
       targets: [new SqsQueue(this.queue)],
     });
   }

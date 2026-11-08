@@ -29,7 +29,7 @@ describe("BookingsStack", () => {
     const fns = Object.entries(template.findResources("AWS::Lambda::Function")).filter(
       ([id]) => !id.startsWith("BucketNotificationsHandler"),
     );
-    expect(fns).toHaveLength(11);
+    expect(fns).toHaveLength(17);
     for (const [, fn] of fns) {
       expect(fn["Properties"]).toMatchObject({
         Runtime: "nodejs24.x",
@@ -85,6 +85,74 @@ describe("BookingsStack", () => {
     });
   });
 
+  it("runs the waitlist on a Standard state machine: one seat at a time, hold, then confirm or move on", () => {
+    template.hasResourceProperties("AWS::StepFunctions::StateMachine", {
+      StateMachineType: "STANDARD",
+      TracingConfiguration: { Enabled: true },
+      LoggingConfiguration: Match.objectLike({ Level: "ALL" }),
+    });
+    const [machine] = Object.values(template.findResources("AWS::StepFunctions::StateMachine"));
+    const definition = JSON.stringify(machine?.["Properties"]);
+    expect(definition).toContain(String.raw`\"Type\":\"Map\"`);
+    expect(definition).toContain(String.raw`\"MaxConcurrency\":1`);
+    expect(definition).toContain(String.raw`States.ArrayRange(1, $.seats, 1)`);
+    expect(definition).toContain(String.raw`\"SecondsPath\":\"$.holdSeconds\"`);
+    expect(definition).toContain(String.raw`\"StringEquals\":\"expired\",\"Next\":\"OfferSeat\"`);
+  });
+
+  it("starts workflows from cancellations and new events on the second stream consumer", () => {
+    template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      FilterCriteria: {
+        Filters: [
+          {
+            Pattern: JSON.stringify({
+              eventName: ["MODIFY"],
+              dynamodb: {
+                Keys: { SK: { S: [{ prefix: "BOOKING#" }] } },
+                OldImage: { status: { S: ["CONFIRMED"] } },
+                NewImage: { status: { S: ["CANCELLED"] } },
+              },
+            }),
+          },
+          { Pattern: JSON.stringify({ eventName: ["INSERT"], dynamodb: { Keys: { SK: { S: ["META"] } } } }) },
+        ],
+      },
+    });
+    expect(
+      Object.keys(
+        template.findResources("AWS::Lambda::EventSourceMapping", {
+          Properties: { EventSourceArn: Match.anyValue(), StartingPosition: "TRIM_HORIZON" },
+        }),
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("schedules reminders in one group through a role only Scheduler in this account can assume", () => {
+    template.hasResourceProperties("AWS::Scheduler::ScheduleGroup", { Name: "bookings-reminders" });
+    template.hasResourceProperties("AWS::IAM::Role", {
+      AssumeRolePolicyDocument: {
+        Statement: [
+          Match.objectLike({
+            Principal: { Service: "scheduler.amazonaws.com" },
+            Condition: { StringEquals: { "aws:SourceAccount": { Ref: "AWS::AccountId" } } },
+          }),
+        ],
+      },
+    });
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: "scheduler:CreateSchedule",
+            Resource: {
+              "Fn::Join": ["", Match.arrayWith([":schedule/bookings-reminders/reminder-*"])],
+            },
+          }),
+        ]),
+      },
+    });
+  });
+
   it("keeps event images in a private, encrypted bucket that triggers validation on upload", () => {
     template.hasResourceProperties("AWS::S3::Bucket", {
       PublicAccessBlockConfiguration: {
@@ -134,6 +202,8 @@ describe("BookingsStack", () => {
       "POST /events",
       "POST /events/{eventId}/bookings",
       "POST /events/{eventId}/image-upload-url",
+      "POST /events/{eventId}/waitlist",
+      "POST /events/{eventId}/waitlist/accept",
     ]);
     for (const route of routes) expect(route.Properties.AuthorizationType).toBe("JWT");
   });

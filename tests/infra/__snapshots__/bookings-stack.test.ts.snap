@@ -390,7 +390,9 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
           ],
           "detail-type": [
             "BookingConfirmed",
-            "BookingCancelled"
+            "BookingCancelled",
+            "WaitlistSeatOffered",
+            "EventReminder"
           ]
         },
         "State": "ENABLED",
@@ -2141,6 +2143,1302 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         "StartingPosition": "TRIM_HORIZON"
       }
     },
+    "JoinWaitlistLogsCED2C2D7": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "JoinWaitlistRole75ED07B1": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "JoinWaitlistRoleDefaultPolicy1F16D4B8": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "JoinWaitlistLogsCED2C2D7",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:ConditionCheckItem"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "JoinWaitlistRoleDefaultPolicy1F16D4B8",
+        "Roles": [
+          {
+            "Ref": "JoinWaitlistRole75ED07B1"
+          }
+        ]
+      }
+    },
+    "JoinWaitlistFn5B1B6D61": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "waitlist",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "JoinWaitlistLogsCED2C2D7"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "JoinWaitlistRole75ED07B1",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "JoinWaitlistRoleDefaultPolicy1F16D4B8",
+        "JoinWaitlistRole75ED07B1"
+      ]
+    },
+    "AcceptWaitlistOfferLogs38CD9F0D": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "AcceptWaitlistOfferRole75A19FC1": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "AcceptWaitlistOfferRoleDefaultPolicy710C5EE3": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AcceptWaitlistOfferLogs38CD9F0D",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingBus52612CDD",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "AcceptWaitlistOfferRoleDefaultPolicy710C5EE3",
+        "Roles": [
+          {
+            "Ref": "AcceptWaitlistOfferRole75A19FC1"
+          }
+        ]
+      }
+    },
+    "AcceptWaitlistOfferFnF1F7E3AB": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "waitlist",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            },
+            "EVENT_BUS_NAME": {
+              "Ref": "MessagingBus52612CDD"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "AcceptWaitlistOfferLogs38CD9F0D"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "AcceptWaitlistOfferRole75A19FC1",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "AcceptWaitlistOfferRoleDefaultPolicy710C5EE3",
+        "AcceptWaitlistOfferRole75A19FC1"
+      ]
+    },
+    "OfferWaitlistSeatLogsF6A1EA5C": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "OfferWaitlistSeatRoleCA1598BB": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "OfferWaitlistSeatRoleDefaultPolicy85B3B6C5": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "OfferWaitlistSeatLogsF6A1EA5C",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "dynamodb:Query",
+                "dynamodb:UpdateItem"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingBus52612CDD",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "OfferWaitlistSeatRoleDefaultPolicy85B3B6C5",
+        "Roles": [
+          {
+            "Ref": "OfferWaitlistSeatRoleCA1598BB"
+          }
+        ]
+      }
+    },
+    "OfferWaitlistSeatFn9D4A99DF": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "waitlist",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            },
+            "EVENT_BUS_NAME": {
+              "Ref": "MessagingBus52612CDD"
+            },
+            "HOLD_SECONDS": "900"
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "OfferWaitlistSeatLogsF6A1EA5C"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "OfferWaitlistSeatRoleCA1598BB",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "OfferWaitlistSeatRoleDefaultPolicy85B3B6C5",
+        "OfferWaitlistSeatRoleCA1598BB"
+      ]
+    },
+    "ResolveWaitlistOfferLogsABEDCC3F": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "ResolveWaitlistOfferRole6EEDEF86": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "ResolveWaitlistOfferRoleDefaultPolicy42D965CC": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ResolveWaitlistOfferLogsABEDCC3F",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:UpdateItem"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "ResolveWaitlistOfferRoleDefaultPolicy42D965CC",
+        "Roles": [
+          {
+            "Ref": "ResolveWaitlistOfferRole6EEDEF86"
+          }
+        ]
+      }
+    },
+    "ResolveWaitlistOfferFnA044B936": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "waitlist",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "ResolveWaitlistOfferLogsABEDCC3F"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "ResolveWaitlistOfferRole6EEDEF86",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "ResolveWaitlistOfferRoleDefaultPolicy42D965CC",
+        "ResolveWaitlistOfferRole6EEDEF86"
+      ]
+    },
+    "SendEventRemindersLogs7BFF5402": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "SendEventRemindersRole51C1F81A": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "SendEventRemindersRoleDefaultPolicy671A0C02": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SendEventRemindersLogs7BFF5402",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:Query"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataTableFDBAD0F2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataTableFDBAD0F2",
+                          "Arn"
+                        ]
+                      },
+                      "/index/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingBus52612CDD",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "SendEventRemindersRoleDefaultPolicy671A0C02",
+        "Roles": [
+          {
+            "Ref": "SendEventRemindersRole51C1F81A"
+          }
+        ]
+      }
+    },
+    "SendEventRemindersFn148486AC": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "reminders",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            },
+            "EVENT_BUS_NAME": {
+              "Ref": "MessagingBus52612CDD"
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "SendEventRemindersLogs7BFF5402"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "SendEventRemindersRole51C1F81A",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "SendEventRemindersRoleDefaultPolicy671A0C02",
+        "SendEventRemindersRole51C1F81A"
+      ]
+    },
+    "TableChangeTriggersLogsA13EE3A2": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "TableChangeTriggersRole9CF3D3A6": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "TableChangeTriggersRoleDefaultPolicy1A4B0176": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TableChangeTriggersLogsA13EE3A2",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "states:StartExecution",
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "WaitlistWorkflowStateMachine9B91B3DE"
+              }
+            },
+            {
+              "Action": "scheduler:CreateSchedule",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":scheduler:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":schedule/bookings-reminders/reminder-*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RemindersSchedulerRoleE4FB1EB7",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingStreamFailuresQueue51D2469B",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "dynamodb:ListStreams",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DataTableFDBAD0F2",
+                  "StreamArn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "dynamodb:DescribeStream",
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DataTableFDBAD0F2",
+                  "StreamArn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "TableChangeTriggersRoleDefaultPolicy1A4B0176",
+        "Roles": [
+          {
+            "Ref": "TableChangeTriggersRole9CF3D3A6"
+          }
+        ]
+      }
+    },
+    "TableChangeTriggersFn1820CF38": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "POWERTOOLS_SERVICE_NAME": "triggers",
+            "POWERTOOLS_METRICS_NAMESPACE": "BookingsApi",
+            "NODE_OPTIONS": "--enable-source-maps",
+            "TABLE_NAME": {
+              "Ref": "DataTableFDBAD0F2"
+            },
+            "STATE_MACHINE_ARN": {
+              "Ref": "WaitlistWorkflowStateMachine9B91B3DE"
+            },
+            "SCHEDULE_GROUP_NAME": "bookings-reminders",
+            "REMINDER_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "SendEventRemindersFn148486AC",
+                "Arn"
+              ]
+            },
+            "SCHEDULER_ROLE_ARN": {
+              "Fn::GetAtt": [
+                "RemindersSchedulerRoleE4FB1EB7",
+                "Arn"
+              ]
+            },
+            "REMINDER_DLQ_ARN": {
+              "Fn::GetAtt": [
+                "RemindersRemindersDlq6CA51AC7",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "TableChangeTriggersLogsA13EE3A2"
+          }
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "TableChangeTriggersRole9CF3D3A6",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      },
+      "DependsOn": [
+        "TableChangeTriggersRoleDefaultPolicy1A4B0176",
+        "TableChangeTriggersRole9CF3D3A6"
+      ]
+    },
+    "TableChangeTriggersFnDynamoDBEventSourceTestDataTableDB6F8BC6A78CBC86": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 25,
+        "BisectBatchOnFunctionError": true,
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "MessagingStreamFailuresQueue51D2469B",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "DataTableFDBAD0F2",
+            "StreamArn"
+          ]
+        },
+        "FilterCriteria": {
+          "Filters": [
+            {
+              "Pattern": "{\\"eventName\\":[\\"MODIFY\\"],\\"dynamodb\\":{\\"Keys\\":{\\"SK\\":{\\"S\\":[{\\"prefix\\":\\"BOOKING#\\"}]}},\\"OldImage\\":{\\"status\\":{\\"S\\":[\\"CONFIRMED\\"]}},\\"NewImage\\":{\\"status\\":{\\"S\\":[\\"CANCELLED\\"]}}}}"
+            },
+            {
+              "Pattern": "{\\"eventName\\":[\\"INSERT\\"],\\"dynamodb\\":{\\"Keys\\":{\\"SK\\":{\\"S\\":[\\"META\\"]}}}}"
+            }
+          ]
+        },
+        "FunctionName": {
+          "Ref": "TableChangeTriggersFn1820CF38"
+        },
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures"
+        ],
+        "MaximumRetryAttempts": 5,
+        "StartingPosition": "TRIM_HORIZON"
+      }
+    },
+    "WaitlistWorkflowLogs704E28FC": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "WaitlistWorkflowStateMachineRole4E838910": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition"
+                        },
+                        ":states:",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        ":",
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        ":stateMachine:*"
+                      ]
+                    ]
+                  }
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "WaitlistWorkflowStateMachineRoleDefaultPolicy03239C88": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "OfferWaitlistSeatFn9D4A99DF",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "OfferWaitlistSeatFn9D4A99DF",
+                          "Arn"
+                        ]
+                      },
+                      ":*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResolveWaitlistOfferFnA044B936",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ResolveWaitlistOfferFnA044B936",
+                          "Arn"
+                        ]
+                      },
+                      ":*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "logs:CreateLogDelivery",
+                "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery",
+                "logs:DeleteLogDelivery",
+                "logs:ListLogDeliveries",
+                "logs:PutResourcePolicy",
+                "logs:DescribeResourcePolicies",
+                "logs:DescribeLogGroups"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "WaitlistWorkflowStateMachineRoleDefaultPolicy03239C88",
+        "Roles": [
+          {
+            "Ref": "WaitlistWorkflowStateMachineRole4E838910"
+          }
+        ]
+      }
+    },
+    "WaitlistWorkflowStateMachine9B91B3DE": {
+      "Type": "AWS::StepFunctions::StateMachine",
+      "Properties": {
+        "DefinitionString": {
+          "Fn::Join": [
+            "",
+            [
+              "{\\"StartAt\\":\\"ListFreedSeats\\",\\"States\\":{\\"ListFreedSeats\\":{\\"Type\\":\\"Pass\\",\\"Parameters\\":{\\"eventId.$\\":\\"$.eventId\\",\\"seatList.$\\":\\"States.ArrayRange(1, $.seats, 1)\\"},\\"Next\\":\\"EachFreedSeat\\"},\\"EachFreedSeat\\":{\\"Type\\":\\"Map\\",\\"ResultPath\\":null,\\"End\\":true,\\"ItemsPath\\":\\"$.seatList\\",\\"ItemSelector\\":{\\"eventId.$\\":\\"$.eventId\\"},\\"ItemProcessor\\":{\\"ProcessorConfig\\":{\\"Mode\\":\\"INLINE\\"},\\"StartAt\\":\\"OfferSeat\\",\\"States\\":{\\"OfferSeat\\":{\\"Next\\":\\"Offered?\\",\\"Retry\\":[{\\"ErrorEquals\\":[\\"Lambda.ClientExecutionTimeoutException\\",\\"Lambda.ServiceException\\",\\"Lambda.AWSLambdaException\\",\\"Lambda.SdkClientException\\"],\\"IntervalSeconds\\":2,\\"MaxAttempts\\":6,\\"BackoffRate\\":2}],\\"Type\\":\\"Task\\",\\"Resource\\":\\"",
+              {
+                "Fn::GetAtt": [
+                  "OfferWaitlistSeatFn9D4A99DF",
+                  "Arn"
+                ]
+              },
+              "\\"},\\"Accepted?\\":{\\"Type\\":\\"Choice\\",\\"Choices\\":[{\\"Variable\\":\\"$.outcome\\",\\"StringEquals\\":\\"expired\\",\\"Next\\":\\"OfferSeat\\"}],\\"Default\\":\\"SeatDone\\"},\\"ResolveOffer\\":{\\"Next\\":\\"Accepted?\\",\\"Retry\\":[{\\"ErrorEquals\\":[\\"Lambda.ClientExecutionTimeoutException\\",\\"Lambda.ServiceException\\",\\"Lambda.AWSLambdaException\\",\\"Lambda.SdkClientException\\"],\\"IntervalSeconds\\":2,\\"MaxAttempts\\":6,\\"BackoffRate\\":2}],\\"Type\\":\\"Task\\",\\"Resource\\":\\"",
+              {
+                "Fn::GetAtt": [
+                  "ResolveWaitlistOfferFnA044B936",
+                  "Arn"
+                ]
+              },
+              "\\"},\\"HoldSeat\\":{\\"Type\\":\\"Wait\\",\\"SecondsPath\\":\\"$.holdSeconds\\",\\"Next\\":\\"ResolveOffer\\"},\\"SeatDone\\":{\\"Type\\":\\"Succeed\\"},\\"Offered?\\":{\\"Type\\":\\"Choice\\",\\"Choices\\":[{\\"Variable\\":\\"$.offered\\",\\"BooleanEquals\\":false,\\"Next\\":\\"SeatDone\\"}],\\"Default\\":\\"HoldSeat\\"}}},\\"MaxConcurrency\\":1}},\\"TimeoutSeconds\\":604800}"
+            ]
+          ]
+        },
+        "LoggingConfiguration": {
+          "Destinations": [
+            {
+              "CloudWatchLogsLogGroup": {
+                "LogGroupArn": {
+                  "Fn::GetAtt": [
+                    "WaitlistWorkflowLogs704E28FC",
+                    "Arn"
+                  ]
+                }
+              }
+            }
+          ],
+          "IncludeExecutionData": false,
+          "Level": "ALL"
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "WaitlistWorkflowStateMachineRole4E838910",
+            "Arn"
+          ]
+        },
+        "StateMachineType": "STANDARD",
+        "TracingConfiguration": {
+          "Enabled": true
+        }
+      },
+      "DependsOn": [
+        "WaitlistWorkflowStateMachineRoleDefaultPolicy03239C88",
+        "WaitlistWorkflowStateMachineRole4E838910"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "RemindersGroupA84262C4": {
+      "Type": "AWS::Scheduler::ScheduleGroup",
+      "Properties": {
+        "Name": "bookings-reminders"
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "RemindersRemindersDlq6CA51AC7": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "SqsManagedSseEnabled": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "RemindersRemindersDlqPolicyB893F73D": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RemindersRemindersDlq6CA51AC7",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Queues": [
+          {
+            "Ref": "RemindersRemindersDlq6CA51AC7"
+          }
+        ]
+      }
+    },
+    "RemindersSchedulerRoleE4FB1EB7": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "scheduler.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "RemindersSchedulerRoleDefaultPolicy9139835C": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SendEventRemindersFn148486AC",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RemindersRemindersDlq6CA51AC7",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "RemindersSchedulerRoleDefaultPolicy9139835C",
+        "Roles": [
+          {
+            "Ref": "RemindersSchedulerRoleE4FB1EB7"
+          }
+        ]
+      }
+    },
     "NotificationWorkerLogs81C7AD23": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
@@ -3016,6 +4314,160 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         }
       }
     },
+    "ApiHttpApiPOSTeventseventIdwaitlist4E921223": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "JoinWaitlistFn5B1B6D61",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdwaitlistPOSTeventseventIdwaitlistPermission6EE3F546": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "JoinWaitlistFn5B1B6D61",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events/{eventId}/waitlist"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdwaitlistEBFA6DF3": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "POST /events/{eventId}/waitlist",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiPOSTeventseventIdwaitlist4E921223"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdwaitlistaccept0453EC3C": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AcceptWaitlistOfferFnF1F7E3AB",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdwaitlistacceptPOSTeventseventIdwaitlistacceptPermission3AB150E9": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AcceptWaitlistOfferFnF1F7E3AB",
+            "Arn"
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiHttpApi4C294DC0"
+              },
+              "/*/*/events/{eventId}/waitlist/accept"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiHttpApiPOSTeventseventIdwaitlistaccept9F4B1BE9": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "ApiHttpApi4C294DC0"
+        },
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "ApiHttpApiCognitoAuthorizerB58DB3E4"
+        },
+        "RouteKey": "POST /events/{eventId}/waitlist/accept",
+        "Target": {
+          "Fn::Join": [
+            "",
+            [
+              "integrations/",
+              {
+                "Ref": "ApiHttpApiPOSTeventseventIdwaitlistaccept0453EC3C"
+              }
+            ]
+          ]
+        }
+      }
+    },
     "ApiAccessLogs50B185DB": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
@@ -3052,6 +4504,16 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
     "StreamFailuresQueueUrl": {
       "Value": {
         "Ref": "MessagingStreamFailuresQueue51D2469B"
+      }
+    },
+    "WaitlistStateMachineArn": {
+      "Value": {
+        "Ref": "WaitlistWorkflowStateMachine9B91B3DE"
+      }
+    },
+    "RemindersDeadLetterQueueUrl": {
+      "Value": {
+        "Ref": "RemindersRemindersDlq6CA51AC7"
       }
     },
     "ImagesBucketName": {

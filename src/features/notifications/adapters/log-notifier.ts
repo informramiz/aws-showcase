@@ -1,6 +1,12 @@
 import type { Logger } from "@aws-lambda-powertools/logger";
-import type { BookingEvent } from "../../bookings/domain/booking-events.js";
-import type { Notifier } from "../domain/notifier.js";
+import type { Notification, Notifier } from "../domain/notifier.js";
+
+const TEMPLATES = {
+  BookingConfirmed: "booking-confirmed",
+  BookingCancelled: "booking-cancelled",
+  WaitlistSeatOffered: "waitlist-seat-offered",
+  EventReminder: "event-reminder",
+} as const satisfies Record<Notification["type"], string>;
 
 /**
  * Stub notifier: logs what would be sent. A real one would look up the user's email via Cognito and
@@ -9,12 +15,12 @@ import type { Notifier } from "../domain/notifier.js";
 export class LogNotifier implements Notifier {
   constructor(private readonly logger: Logger) {}
 
-  notify(event: BookingEvent): Promise<void> {
+  notify(notification: Notification): Promise<void> {
     this.logger.info("Notification sent", {
-      template: event.type === "BookingConfirmed" ? "booking-confirmed" : "booking-cancelled",
-      bookingId: event.bookingId,
-      eventId: event.eventId,
-      userId: event.userId,
+      template: TEMPLATES[notification.type],
+      eventId: notification.eventId,
+      userId: notification.userId,
+      ...("bookingId" in notification ? { bookingId: notification.bookingId } : {}),
     });
     return Promise.resolve();
   }

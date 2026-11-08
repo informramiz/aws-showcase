@@ -1,6 +1,7 @@
 import type { AttributeValue } from "@aws-sdk/client-dynamodb";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
-import type { DynamoDBRecord } from "aws-lambda";
+import { BatchProcessor, EventType, processPartialResponse } from "@aws-lambda-powertools/batch";
+import type { Context, DynamoDBBatchResponse, DynamoDBRecord, DynamoDBStreamEvent } from "aws-lambda";
 
 export type ChangeKind = "INSERT" | "MODIFY" | "REMOVE";
 export type Item = Record<string, unknown>;
@@ -37,4 +38,16 @@ export const toStreamChange = (record: DynamoDBRecord): StreamChange => {
     ...(oldImage === undefined ? {} : { oldImage }),
     ...(newImage === undefined ? {} : { newImage }),
   };
+};
+
+/**
+ * DynamoDB Streams batch handler with partial batch responses: a failed record is reported back so
+ * Lambda retries from it (with bisecting) instead of replaying the whole batch. Records run one at a
+ * time to keep per-item ordering, which consumers of one partition's changes rely on.
+ */
+export const makeStreamHandler = (onChange: (change: StreamChange) => Promise<void>) => {
+  const processor = new BatchProcessor(EventType.DynamoDBStreams);
+  const recordHandler = (record: DynamoDBRecord): Promise<void> => onChange(toStreamChange(record));
+  return (event: DynamoDBStreamEvent, context: Context): Promise<DynamoDBBatchResponse> =>
+    processPartialResponse(event, recordHandler, processor, { context, processInParallel: false });
 };

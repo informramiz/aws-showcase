@@ -3,7 +3,7 @@ import type { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { describe, expect, it, vi } from "vitest";
 import { DynamoDbBookingRepository } from "../../../src/features/bookings/adapters/dynamodb-booking-repository.js";
-import { EventBridgeBookingPublisher } from "../../../src/features/bookings/adapters/eventbridge-publisher.js";
+import { EventBridgePublisher } from "../../../src/shared/events/eventbridge-publisher.js";
 import { makeIdempotentBookSeats } from "../../../src/features/bookings/adapters/idempotent-book-seats.js";
 import type { BookSeats } from "../../../src/features/bookings/application/book-seats.js";
 import { bookingEvent } from "../../../src/features/bookings/domain/booking-events.js";
@@ -51,12 +51,12 @@ describe("DynamoDbBookingRepository transaction handling", () => {
   });
 });
 
-describe("EventBridgeBookingPublisher", () => {
+describe("EventBridgePublisher", () => {
   const event = bookingEvent("BookingConfirmed", aBooking(), NOW);
 
   it("puts the event on the bus with source and detail-type", async () => {
     const send = vi.fn().mockResolvedValue({ FailedEntryCount: 0 });
-    await new EventBridgeBookingPublisher({ send } as unknown as EventBridgeClient, "bus").publish(event);
+    await new EventBridgePublisher({ send } as unknown as EventBridgeClient, "bus").publish(event);
 
     const input = (send.mock.calls[0]?.[0] as { input: { Entries: unknown[] } }).input;
     expect(input.Entries).toEqual([
@@ -69,14 +69,23 @@ describe("EventBridgeBookingPublisher", () => {
       .fn()
       .mockResolvedValue({ FailedEntryCount: 1, Entries: [{ ErrorCode: "Throttled", ErrorMessage: "slow down" }] });
     await expect(
-      new EventBridgeBookingPublisher({ send } as unknown as EventBridgeClient, "bus").publish(event),
+      new EventBridgePublisher({ send } as unknown as EventBridgeClient, "bus").publish(event),
     ).rejects.toThrow("Throttled slow down");
+  });
+
+  it("sends at most 10 entries per PutEvents call", async () => {
+    const send = vi.fn().mockResolvedValue({ FailedEntryCount: 0 });
+    const events = Array.from({ length: 23 }, () => event);
+    await new EventBridgePublisher({ send } as unknown as EventBridgeClient, "bus").publishAll(events);
+
+    const sizes = send.mock.calls.map((c) => (c[0] as { input: { Entries: unknown[] } }).input.Entries.length);
+    expect(sizes).toEqual([10, 10, 3]);
   });
 
   it("reports an unknown failure when there are no entry details", async () => {
     const send = vi.fn().mockResolvedValue({ FailedEntryCount: 1 });
     await expect(
-      new EventBridgeBookingPublisher({ send } as unknown as EventBridgeClient, "bus").publish(event),
+      new EventBridgePublisher({ send } as unknown as EventBridgeClient, "bus").publish(event),
     ).rejects.toThrow("unknown");
   });
 });

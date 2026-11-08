@@ -7,7 +7,7 @@ import type { EventRepository } from "../../events/domain/event-repository.js";
 import { type Booking, requestBooking } from "../domain/booking.js";
 import { bookingEvent, type BookingEventPublisher } from "../domain/booking-events.js";
 import type { BookingRepository } from "../domain/booking-repository.js";
-import { publishSafely } from "./publish-safely.js";
+import { publishSafely } from "../../../shared/events/publish-safely.js";
 
 export interface BookSeatsCommand {
   readonly eventId: string;
