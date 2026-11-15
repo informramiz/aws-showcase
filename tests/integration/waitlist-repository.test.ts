@@ -83,6 +83,21 @@ describe("DynamoDbWaitlistRepository (DynamoDB Local)", () => {
     expect(await seatsLeft()).toBe(0);
   });
 
+  it("keeps looking past the first page of the queue so a freed seat never skips someone waiting", async () => {
+    await sellOut();
+    const booked = ["a", "b", "c", "d", "e", "f"];
+    for (const [i, userId] of booked.entries()) await join(userId, later(i));
+    await join("last", later(10));
+    for (const userId of booked) {
+      await doc.send(
+        new PutCommand({ TableName: tableName, Item: { ...Keys.attendee(event.id, userId), type: "Attendee" } }),
+      );
+    }
+    await freeSeat();
+
+    expect(await waitlist.offerNext(event.id, NOW, HOLD_UNTIL)).toMatchObject({ offered: true, userId: "last" });
+  });
+
   it("offers nothing when the queue is empty or the event has started", async () => {
     await sellOut();
     await join("u1");

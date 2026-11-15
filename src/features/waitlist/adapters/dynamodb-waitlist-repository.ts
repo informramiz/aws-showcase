@@ -14,8 +14,13 @@ import { toBookingItem } from "../../bookings/adapters/dynamodb-booking-reposito
 import { type OfferResolution, type OfferResult, type WaitlistEntry, WaitlistErrors } from "../domain/waitlist.js";
 import type { WaitlistRepository } from "../domain/waitlist-repository.js";
 
-/** GSI1 has no consistent reads, so the head of the queue can be stale; try the next few on a clash. */
-const MAX_OFFER_CANDIDATES = 5;
+/**
+ * GSI1 has no consistent reads, so entries read from the queue can be stale or already booked: skip them
+ * and move down the queue, a page at a time, so a freed seat never bypasses people still waiting.
+ */
+const CANDIDATE_PAGE_SIZE = 5;
+/** Bounds one offer attempt (a Lambda run) on a very long queue of unusable entries. */
+const MAX_CANDIDATES_EXAMINED = 100;
 
 const fromItem = (item: Record<string, unknown>): WaitlistEntry => {
   const e = item as unknown as WaitlistEntry;
@@ -105,25 +110,32 @@ export class DynamoDbWaitlistRepository implements WaitlistRepository {
   }
 
   async offerNext(eventId: string, now: Date, offerExpiresAt: Date): Promise<OfferResult> {
-    const { Items = [] } = await this.db.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: GSI1,
-        KeyConditionExpression: "GSI1PK = :pk",
-        ExpressionAttributeValues: { ":pk": Keys.waitlistQueue(eventId, "", "").GSI1PK },
-        Limit: MAX_OFFER_CANDIDATES,
-      }),
-    );
-    for (const candidate of Items.map(fromItem)) {
-      try {
-        await this.offerTo(candidate, now, offerExpiresAt);
-        return { offered: true, userId: candidate.userId, offerExpiresAt: offerExpiresAt.toISOString() };
-      } catch (error) {
-        if (error instanceof NoSeat) return { offered: false };
-        if (error instanceof AlreadyBooked) await this.closeBooked(candidate, now);
-        else if (!(error instanceof StaleCandidate)) throw error;
+    let examined = 0;
+    let startKey: Record<string, unknown> | undefined;
+    do {
+      const { Items = [], LastEvaluatedKey } = await this.db.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: GSI1,
+          KeyConditionExpression: "GSI1PK = :pk",
+          ExpressionAttributeValues: { ":pk": Keys.waitlistQueue(eventId, "", "").GSI1PK },
+          Limit: CANDIDATE_PAGE_SIZE,
+          ...(startKey === undefined ? {} : { ExclusiveStartKey: startKey }),
+        }),
+      );
+      for (const candidate of Items.map(fromItem)) {
+        examined += 1;
+        try {
+          await this.offerTo(candidate, now, offerExpiresAt);
+          return { offered: true, userId: candidate.userId, offerExpiresAt: offerExpiresAt.toISOString() };
+        } catch (error) {
+          if (error instanceof NoSeat) return { offered: false };
+          if (error instanceof AlreadyBooked) await this.closeBooked(candidate, now);
+          else if (!(error instanceof StaleCandidate)) throw error;
+        }
       }
-    }
+      startKey = LastEvaluatedKey;
+    } while (startKey !== undefined && examined < MAX_CANDIDATES_EXAMINED);
     return { offered: false };
   }
 

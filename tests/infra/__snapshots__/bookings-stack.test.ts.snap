@@ -2681,7 +2681,8 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
             {
               "Action": [
                 "dynamodb:Query",
-                "dynamodb:UpdateItem"
+                "dynamodb:UpdateItem",
+                "dynamodb:ConditionCheckItem"
               ],
               "Effect": "Allow",
               "Resource": [
@@ -3552,6 +3553,50 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
       ],
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
+    },
+    "WaitlistWorkflowExecutionsFailedAlarm6EBE2F2A": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "A waitlist execution ended abnormally; an offered seat may be held. Check the execution.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "StateMachineArn",
+            "Value": {
+              "Ref": "WaitlistWorkflowStateMachine9B91B3DE"
+            }
+          }
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ExecutionsFailed",
+        "Namespace": "AWS/States",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching"
+      }
+    },
+    "WaitlistWorkflowExecutionsTimedOutAlarm732607E7": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "A waitlist execution ended abnormally; an offered seat may be held. Check the execution.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Dimensions": [
+          {
+            "Name": "StateMachineArn",
+            "Value": {
+              "Ref": "WaitlistWorkflowStateMachine9B91B3DE"
+            }
+          }
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ExecutionsTimedOut",
+        "Namespace": "AWS/States",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching"
+      }
     },
     "RemindersGroupA84262C4": {
       "Type": "AWS::Scheduler::ScheduleGroup",
