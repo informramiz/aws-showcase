@@ -25,9 +25,9 @@ describe("BookingsStack", () => {
   });
 
   it("runs every app function on Node 24 arm64 with X-Ray tracing", () => {
-    // The only other function is CDK's own deploy-time handler that wires the S3 notification.
+    // The only other functions are CDK's own deploy-time handlers (S3 notification, bucket auto-delete).
     const fns = Object.entries(template.findResources("AWS::Lambda::Function")).filter(
-      ([id]) => !id.startsWith("BucketNotificationsHandler"),
+      ([id]) => !id.startsWith("BucketNotificationsHandler") && !id.startsWith("CustomS3AutoDeleteObjects"),
     );
     expect(fns).toHaveLength(17);
     for (const [, fn] of fns) {
@@ -37,6 +37,24 @@ describe("BookingsStack", () => {
         TracingConfig: { Mode: "Active" },
       });
     }
+  });
+
+  it("sends failed asynchronous invocations (S3, Scheduler) to a queue instead of dropping them", () => {
+    const configs = Object.values(template.findResources("AWS::Lambda::EventInvokeConfig"));
+    expect(configs).toHaveLength(2);
+    for (const config of configs) {
+      expect(config["Properties"]).toMatchObject({
+        DestinationConfig: {
+          OnFailure: { Destination: { "Fn::GetAtt": ["MessagingAsyncFailuresQueue44AA5B7D", "Arn"] } },
+        },
+      });
+    }
+  });
+
+  it("retries ResolveOffer on task failures, because it returns the seat an offer took", () => {
+    const machine = Object.values(template.findResources("AWS::StepFunctions::StateMachine"))[0];
+    const definition = JSON.stringify(machine?.["Properties"]);
+    expect(definition).toContain("States.TaskFailed");
   });
 
   it("keeps all data in one table with a GSI, PITR and a TTL-backed idempotency table", () => {

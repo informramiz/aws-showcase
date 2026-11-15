@@ -1,6 +1,7 @@
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from "aws-cdk-lib";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import type { ITable } from "aws-cdk-lib/aws-dynamodb";
+import { SqsDestination } from "aws-cdk-lib/aws-lambda-destinations";
 import { FilterCriteria, FilterRule, type IFunction, StartingPosition } from "aws-cdk-lib/aws-lambda";
 import { DynamoEventSource, SqsDlq, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import type { Construct } from "constructs";
@@ -35,8 +36,20 @@ export class BookingsStack extends Stack {
     const images = new Images(this, "Images", { removalPolicy });
 
     const table = { TABLE_NAME: data.table.tableName };
-    const fn = (id: string, entry: string, serviceName: string, environment: Record<string, string> = table) =>
-      new AppFunction(this, id, { entry, serviceName, environment, removalPolicy }).fn;
+    const fn = (
+      id: string,
+      entry: string,
+      serviceName: string,
+      environment: Record<string, string> = table,
+      timeout?: Duration,
+    ) =>
+      new AppFunction(this, id, {
+        entry,
+        serviceName,
+        environment,
+        removalPolicy,
+        ...(timeout === undefined ? {} : { timeout }),
+      }).fn;
 
     const createEvent = fn("CreateEvent", "create-event", "events");
     const listEvents = fn("ListEvents", "list-events", "events");
@@ -67,7 +80,13 @@ export class BookingsStack extends Stack {
       HOLD_SECONDS: String(WAITLIST_HOLD.toSeconds()),
     });
     const resolveOffer = fn("ResolveWaitlistOffer", "resolve-waitlist-offer", "waitlist");
-    const sendReminders = fn("SendEventReminders", "send-event-reminders", "reminders", bus);
+    // Up to 10,000 attendees, published in parallel batches of PutEvents calls: well over the 10 s default.
+    const sendReminders = fn("SendEventReminders", "send-event-reminders", "reminders", bus, Duration.minutes(5));
+    // S3 and Scheduler invoke Lambda asynchronously: after Lambda's own retries a failed event would
+    // be dropped, so it goes to a queue instead.
+    for (const asyncFn of [processEventImage, sendReminders]) {
+      asyncFn.configureAsyncInvoke({ onFailure: new SqsDestination(messaging.asyncFailures) });
+    }
     const tableTriggers = fn("TableChangeTriggers", "table-change-triggers", "triggers");
     const workflow = new WaitlistWorkflow(this, "WaitlistWorkflow", { offerSeat, resolveOffer, removalPolicy });
     const reminders = new Reminders(this, "Reminders", { target: sendReminders, removalPolicy });
@@ -179,6 +198,7 @@ export class BookingsStack extends Stack {
     new CfnOutput(this, "DeadLetterQueueUrl", { value: messaging.deadLetterQueue.queueUrl });
     new CfnOutput(this, "StreamFailuresQueueUrl", { value: messaging.streamFailures.queueUrl });
     new CfnOutput(this, "WaitlistStateMachineArn", { value: workflow.stateMachine.stateMachineArn });
+    new CfnOutput(this, "AsyncFailuresQueueUrl", { value: messaging.asyncFailures.queueUrl });
     new CfnOutput(this, "RemindersDeadLetterQueueUrl", { value: reminders.deadLetterQueue.queueUrl });
     new CfnOutput(this, "ImagesBucketName", { value: images.bucket.bucketName });
 

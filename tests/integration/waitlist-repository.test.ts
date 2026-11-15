@@ -1,4 +1,4 @@
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DynamoDbBookingRepository } from "../../src/features/bookings/adapters/dynamodb-booking-repository.js";
 import { DynamoDbEventRepository } from "../../src/features/events/adapters/dynamodb-event-repository.js";
@@ -67,6 +67,20 @@ describe("DynamoDbWaitlistRepository (DynamoDB Local)", () => {
 
     // No seat left for u2 until the offer resolves.
     expect(await waitlist.offerNext(event.id, NOW, HOLD_UNTIL)).toEqual({ offered: false });
+  });
+
+  it("skips and closes a waiting entry whose user booked directly, and offers the next person", async () => {
+    await sellOut();
+    await join("u1");
+    await join("u2", later(1));
+    await doc.send(
+      new PutCommand({ TableName: tableName, Item: { ...Keys.attendee(event.id, "u1"), type: "Attendee" } }),
+    );
+    await freeSeat();
+
+    expect(await waitlist.offerNext(event.id, NOW, HOLD_UNTIL)).toMatchObject({ offered: true, userId: "u2" });
+    expect(await waitlist.find(event.id, "u1")).toMatchObject({ status: "EXPIRED" });
+    expect(await seatsLeft()).toBe(0);
   });
 
   it("offers nothing when the queue is empty or the event has started", async () => {

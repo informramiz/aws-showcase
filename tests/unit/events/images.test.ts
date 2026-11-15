@@ -152,6 +152,7 @@ describe("ProcessUploadedImage", () => {
     ["a non-image body", key, 10, new TextEncoder().encode("#!/bin/sh echo")],
     ["an oversized file", key, MAX_IMAGE_BYTES + 1, JPEG],
     ["a key the API never issued", "events/whatever.jpg", 10, JPEG],
+    ["a PNG uploaded under a .jpg key", key, 10, PNG],
   ])("deletes %s", async (_name, objectKey, size, bytes) => {
     const { events, store, telemetry, useCase } = setup();
     store.objects.set(objectKey, bytes);

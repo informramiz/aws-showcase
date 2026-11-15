@@ -82,6 +82,23 @@ describe("EventBridgePublisher", () => {
     expect(sizes).toEqual([10, 10, 3]);
   });
 
+  it("sends batches in parallel, at most 10 PutEvents calls at once, and still sends them all", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const send = vi.fn(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight -= 1;
+      return { FailedEntryCount: 0 };
+    });
+    const events = Array.from({ length: 10 * 25 }, () => event);
+    await new EventBridgePublisher({ send } as unknown as EventBridgeClient, "bus").publishAll(events);
+
+    expect(send).toHaveBeenCalledTimes(25);
+    expect(peak).toBe(10);
+  });
+
   it("reports an unknown failure when there are no entry details", async () => {
     const send = vi.fn().mockResolvedValue({ FailedEntryCount: 1 });
     await expect(

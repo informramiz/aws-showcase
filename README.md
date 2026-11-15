@@ -26,7 +26,8 @@ flowchart LR
   S3 -->|ObjectCreated| PI[ProcessEventImage]
   PI --> T
   T -->|stream| PS[ProjectEventStats]
-  PS --> ST[(Stats + dedupe tables)]
+  PS --> T
+  PS --> I
   T -->|stream, filtered| TT[TableChangeTriggers]
   TT -->|StartExecution on cancel| SF[[Step Functions Standard<br/>waitlist workflow]]
   SF --> OS[OfferWaitlistSeat] & RO[ResolveWaitlistOffer]
@@ -96,7 +97,7 @@ Cancelling runs the reverse transaction: it returns the seats, marks the booking
 
 1. The organizer calls `POST /events/{eventId}/image-upload-url` with the content type and size. The function checks ownership and limits (JPEG, PNG or WebP, at most 5 MiB) and returns a presigned PUT URL valid for 5 minutes. The signature covers the content type and length, so the client can't swap them.
 2. The client uploads straight to the private bucket, so no image bytes pass through Lambda or API Gateway.
-3. The `ObjectCreated` notification invokes `ProcessEventImage`. It reads only the first bytes with a ranged GET and checks the magic bytes against the declared type. A match attaches `image` to the event; anything else is deleted.
+3. The `ObjectCreated` notification invokes `ProcessEventImage`. It reads only the first bytes with a ranged GET and checks the magic bytes against the type in the object key (which the presigned URL fixed). A match attaches `image` to the event; anything else is deleted. A run that fails inside the function is retried by Lambda and then lands in the async-failures queue.
 
 ### Waitlist
 
@@ -109,11 +110,11 @@ Cancelling runs the reverse transaction: it returns the seats, marks the booking
 
 1. A new event item (`INSERT` on `META`) reaches `TableChangeTriggers` through the same filtered stream.
 2. If the event starts more than 24 hours from now, it creates a one-time EventBridge Scheduler schedule `reminder-<eventId>` with an `at()` expression, in a dedicated schedule group, with `ActionAfterCompletion: DELETE` so the schedule removes itself after running. A retried stream batch gets `ConflictException`, which counts as done.
-3. At that time Scheduler invokes `SendEventReminders` (failed invocations go to a DLQ). It reads the confirmed bookings and publishes one `EventReminder` per attendee to the bus, so reminders reuse the notification queue, retries and DLQ.
+3. At that time Scheduler invokes `SendEventReminders` (invocations Scheduler cannot deliver go to the reminders DLQ; a run that fails inside the function is retried by Lambda and then lands in the async-failures queue). It reads the confirmed bookings and publishes one `EventReminder` per attendee to the bus, so reminders reuse the notification queue, retries and DLQ.
 
 ### Organizer stats
 
-`ProjectEventStats` reads every stream record and updates per-event counters: confirmed and cancelled bookings, seats booked, and waitlist joins, offers, acceptances and expiries. Each update is a transaction that also writes the stream record's `eventID` into a dedupe table with a 2-day TTL, so a replayed batch never counts twice. `GET /events/{eventId}/stats` returns the counters to the event's organizer.
+`ProjectEventStats` reads every stream record and updates per-event counters: confirmed and cancelled bookings, seats booked, and waitlist joins, offers, acceptances and expiries. Each update is a transaction that also writes the stream record's `eventID` into the idempotency table with a 2-day TTL, so a replayed batch never counts twice. `GET /events/{eventId}/stats` returns the counters to the event's organizer.
 
 ## Decisions
 
@@ -172,9 +173,9 @@ npx cdk bootstrap aws://<account>/<region>   # once per account and region
 npx cdk deploy BookingsApi
 ```
 
-The stack outputs the API URL, the user pool ID, the app client ID, the DLQ URLs and the waitlist state machine ARN. Create users in the pool and add them to the `organizers` or `attendees` group. An app client using the SRP flow (for example Amplify) can then get an access token.
+The stack outputs the API URL, the user pool ID, the app client ID, the DLQ and failure-queue URLs and the waitlist state machine ARN. Create users in the pool and add them to the `organizers` or `attendees` group. An app client using the SRP flow (for example Amplify) can then get an access token.
 
-The defaults are for a demo: on-demand billing, `RemovalPolicy.DESTROY` on tables, queues and log groups, 7-day log retention, and stage throttling at 50 requests per second (burst 100). For real data, pass `removalPolicy: RemovalPolicy.RETAIN` to `BookingsStack`. `npx cdk destroy BookingsApi` removes everything.
+The defaults are for a demo: on-demand billing, `RemovalPolicy.DESTROY` on tables, queues and log groups, 7-day log retention, and stage throttling at 50 requests per second (burst 100). For real data, pass `removalPolicy: RemovalPolicy.RETAIN` to `BookingsStack`. `npx cdk destroy BookingsApi` removes everything, including the image bucket (emptied automatically while the removal policy is `DESTROY`).
 
 ## Cost
 

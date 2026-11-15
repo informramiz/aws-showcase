@@ -1,5 +1,11 @@
 import type { Telemetry } from "../../../shared/telemetry.js";
-import { detectImageType, eventIdFromImageKey, IMAGE_HEADER_BYTES, MAX_IMAGE_BYTES } from "../domain/event-image.js";
+import {
+  detectImageType,
+  eventIdFromImageKey,
+  imageTypeFromKey,
+  IMAGE_HEADER_BYTES,
+  MAX_IMAGE_BYTES,
+} from "../domain/event-image.js";
 import type { EventRepository } from "../domain/event-repository.js";
 import type { ImageStore } from "../domain/image-storage.js";
 
@@ -50,7 +56,8 @@ export class ProcessUploadedImage {
       if (header === undefined) return "missing";
       contentType = detectImageType(header);
     }
-    if (eventId === undefined || contentType === undefined) {
+    // The bytes must be the type the key promises: a PNG uploaded under a .jpg key is not what was approved.
+    if (eventId === undefined || contentType === undefined || contentType !== imageTypeFromKey(key)) {
       await this.store.delete(key);
       return "rejected";
     }

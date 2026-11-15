@@ -23,6 +23,8 @@ export class Messaging extends Construct {
   readonly deadLetterQueue: Queue;
   /** On-failure destination for stream consumers: metadata of batches that ran out of retries. */
   readonly streamFailures: Queue;
+  /** On-failure destination for asynchronously invoked functions (S3 and Scheduler call Lambda async). */
+  readonly asyncFailures: Queue;
 
   constructor(scope: Construct, id: string, props: MessagingProps) {
     super(scope, id);
@@ -46,6 +48,13 @@ export class Messaging extends Construct {
     });
 
     this.streamFailures = new Queue(this, "StreamFailuresQueue", {
+      encryption: QueueEncryption.SQS_MANAGED,
+      enforceSSL: true,
+      retentionPeriod: Duration.days(14),
+      removalPolicy: props.removalPolicy,
+    });
+
+    this.asyncFailures = new Queue(this, "AsyncFailuresQueue", {
       encryption: QueueEncryption.SQS_MANAGED,
       enforceSSL: true,
       retentionPeriod: Duration.days(14),

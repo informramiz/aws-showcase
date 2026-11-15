@@ -54,12 +54,12 @@ export const applyNagSuppressions = (stack: Stack, { table, bucket, workflowTask
     {
       id: "AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]",
       reason:
-        "Only the CDK-managed BucketNotificationsHandler (a deploy-time custom resource that wires the S3 notification) uses the AWS managed basic execution policy; app functions use their own scoped roles.",
+        "Only the CDK-managed custom-resource providers (BucketNotificationsHandler wires the S3 notification, the auto-delete provider empties the bucket on destroy) use the AWS managed basic execution policy; app functions use their own scoped roles.",
     },
     {
       id: "AwsSolutions-SQS3",
       reason:
-        "Only the StreamFailuresQueue lacks a DLQ: it is itself the terminal on-failure destination for the DynamoDB stream consumers (it holds batch metadata for replay), so it has nothing further to dead-letter to.",
+        "Three queues lack a DLQ, each because it is itself a terminal failure destination: StreamFailuresQueue (DynamoDB stream batch metadata for replay), AsyncFailuresQueue (failed asynchronous Lambda invocations) and RemindersDlq (undeliverable Scheduler invocations). Nothing further to dead-letter to. A new queue needs its own DLQ or an entry here.",
     },
     {
       id: "AwsSolutions-COG2",
