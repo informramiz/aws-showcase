@@ -171,7 +171,6 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
           "https://example.com"
         ],
         "ExplicitAuthFlows": [
-          "ALLOW_USER_PASSWORD_AUTH",
           "ALLOW_USER_SRP_AUTH",
           "ALLOW_REFRESH_TOKEN_AUTH"
         ],
@@ -378,6 +377,48 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         ]
       }
     },
+    "MessagingAsyncFailuresQueue44AA5B7D": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "SqsManagedSseEnabled": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "MessagingAsyncFailuresQueuePolicyE27D4EC0": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingAsyncFailuresQueue44AA5B7D",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Queues": [
+          {
+            "Ref": "MessagingAsyncFailuresQueue44AA5B7D"
+          }
+        ]
+      }
+    },
     "MessagingBookingEventsRuleE31E460E": {
       "Type": "AWS::Events::Rule",
       "Properties": {
@@ -467,7 +508,13 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
           "BlockPublicPolicy": true,
           "IgnorePublicAcls": true,
           "RestrictPublicBuckets": true
-        }
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true"
+          }
+        ]
       },
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
@@ -513,11 +560,69 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
                   ]
                 }
               ]
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ImagesBucket4B6DB8E1",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ImagesBucket4B6DB8E1",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
             }
           ],
           "Version": "2012-10-17"
         }
       }
+    },
+    "ImagesBucketAutoDeleteObjectsCustomResource4CBA80C7": {
+      "Type": "Custom::S3AutoDeleteObjects",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+            "Arn"
+          ]
+        },
+        "BucketName": {
+          "Ref": "ImagesBucket4B6DB8E1"
+        }
+      },
+      "DependsOn": [
+        "ImagesBucketPolicyF5EB529F"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
     "ImagesBucketNotificationsHandlerPolicyED4D43FE": {
       "Type": "AWS::IAM::Policy",
@@ -612,6 +717,63 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
           ]
         }
       }
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          }
+        ]
+      }
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "<bucket>"-\${AWS::Region}"
+          },
+          "S3Key": "<asset-hash>.zip"
+        },
+        "Timeout": 900,
+        "MemorySize": 128,
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Lambda function for auto-deleting objects in ",
+              {
+                "Ref": "ImagesBucket4B6DB8E1"
+              },
+              " S3 bucket."
+            ]
+          ]
+        }
+      },
+      "DependsOn": [
+        "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+      ]
     },
     "CreateEventLogsA9A7402A": {
       "Type": "AWS::Logs::LogGroup",
@@ -1677,6 +1839,20 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
               "Resource": "*"
             },
             {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingAsyncFailuresQueue44AA5B7D",
+                  "Arn"
+                ]
+              }
+            },
+            {
               "Action": "dynamodb:UpdateItem",
               "Effect": "Allow",
               "Resource": [
@@ -1782,6 +1958,25 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         "ProcessEventImageRoleDefaultPolicyDB422DE9",
         "ProcessEventImageRole80C1EABE"
       ]
+    },
+    "ProcessEventImageFnEventInvokeConfigEEB1CC78": {
+      "Type": "AWS::Lambda::EventInvokeConfig",
+      "Properties": {
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "MessagingAsyncFailuresQueue44AA5B7D",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "FunctionName": {
+          "Ref": "ProcessEventImageFn15318290"
+        },
+        "Qualifier": "$LATEST"
+      }
     },
     "GetEventStatsLogs0CAE7CA4": {
       "Type": "AWS::Logs::LogGroup",
@@ -2773,6 +2968,20 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
             },
             {
               "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MessagingAsyncFailuresQueue44AA5B7D",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
                 "dynamodb:GetItem",
                 "dynamodb:Query"
               ],
@@ -2860,7 +3069,7 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
           ]
         },
         "Runtime": "nodejs24.x",
-        "Timeout": 10,
+        "Timeout": 300,
         "TracingConfig": {
           "Mode": "Active"
         }
@@ -2869,6 +3078,25 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
         "SendEventRemindersRoleDefaultPolicy671A0C02",
         "SendEventRemindersRole51C1F81A"
       ]
+    },
+    "SendEventRemindersFnEventInvokeConfigAF90D13B": {
+      "Type": "AWS::Lambda::EventInvokeConfig",
+      "Properties": {
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "MessagingAsyncFailuresQueue44AA5B7D",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "FunctionName": {
+          "Ref": "SendEventRemindersFn148486AC"
+        },
+        "Qualifier": "$LATEST"
+      }
     },
     "TableChangeTriggersLogsA13EE3A2": {
       "Type": "AWS::Logs::LogGroup",
@@ -3280,7 +3508,7 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
                   "Arn"
                 ]
               },
-              "\\"},\\"Accepted?\\":{\\"Type\\":\\"Choice\\",\\"Choices\\":[{\\"Variable\\":\\"$.outcome\\",\\"StringEquals\\":\\"expired\\",\\"Next\\":\\"OfferSeat\\"}],\\"Default\\":\\"SeatDone\\"},\\"ResolveOffer\\":{\\"Next\\":\\"Accepted?\\",\\"Retry\\":[{\\"ErrorEquals\\":[\\"Lambda.ClientExecutionTimeoutException\\",\\"Lambda.ServiceException\\",\\"Lambda.AWSLambdaException\\",\\"Lambda.SdkClientException\\"],\\"IntervalSeconds\\":2,\\"MaxAttempts\\":6,\\"BackoffRate\\":2}],\\"Type\\":\\"Task\\",\\"Resource\\":\\"",
+              "\\"},\\"Accepted?\\":{\\"Type\\":\\"Choice\\",\\"Choices\\":[{\\"Variable\\":\\"$.outcome\\",\\"StringEquals\\":\\"expired\\",\\"Next\\":\\"OfferSeat\\"}],\\"Default\\":\\"SeatDone\\"},\\"ResolveOffer\\":{\\"Next\\":\\"Accepted?\\",\\"Retry\\":[{\\"ErrorEquals\\":[\\"Lambda.ClientExecutionTimeoutException\\",\\"Lambda.ServiceException\\",\\"Lambda.AWSLambdaException\\",\\"Lambda.SdkClientException\\"],\\"IntervalSeconds\\":2,\\"MaxAttempts\\":6,\\"BackoffRate\\":2},{\\"ErrorEquals\\":[\\"States.TaskFailed\\"],\\"IntervalSeconds\\":2,\\"MaxAttempts\\":8,\\"BackoffRate\\":2}],\\"Type\\":\\"Task\\",\\"Resource\\":\\"",
               {
                 "Fn::GetAtt": [
                   "ResolveWaitlistOfferFnA044B936",
@@ -4509,6 +4737,11 @@ exports[`BookingsStack > matches the reviewed template snapshot 1`] = `
     "WaitlistStateMachineArn": {
       "Value": {
         "Ref": "WaitlistWorkflowStateMachine9B91B3DE"
+      }
+    },
+    "AsyncFailuresQueueUrl": {
+      "Value": {
+        "Ref": "MessagingAsyncFailuresQueue44AA5B7D"
       }
     },
     "RemindersDeadLetterQueueUrl": {

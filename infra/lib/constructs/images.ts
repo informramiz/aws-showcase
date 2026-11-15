@@ -1,4 +1,4 @@
-import { Duration, type RemovalPolicy } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import type { IFunction } from "aws-cdk-lib/aws-lambda";
 import {
@@ -33,7 +33,8 @@ export class Images extends Construct {
       enforceSSL: true,
       objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
       removalPolicy: props.removalPolicy,
-      autoDeleteObjects: false,
+      // Lets `cdk destroy` empty the bucket first; only ever true together with RemovalPolicy.DESTROY.
+      autoDeleteObjects: props.removalPolicy === RemovalPolicy.DESTROY,
       lifecycleRules: [
         // Failed multipart uploads leave invisible parts that are still billed.
         { id: "abort-incomplete-uploads", abortIncompleteMultipartUploadAfter: Duration.days(1) },

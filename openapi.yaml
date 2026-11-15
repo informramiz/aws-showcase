@@ -149,7 +149,7 @@ paths:
       description: |
         Upload with a PUT to `uploadUrl`, sending the returned `headers` unchanged (they are signed).
         After the upload, S3 triggers a function that checks the file's magic bytes and attaches the
-        image to the event; an object that is not the declared image type is deleted.
+        image to the event; an object whose bytes are not the image type in its key is deleted.
       operationId: createImageUpload
       parameters:
         - $ref: "#/components/parameters/EventId"
@@ -244,7 +244,7 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "409":
-          description: "`OFFER_EXPIRED`"
+          description: "`OFFER_EXPIRED`, `ALREADY_BOOKED` or `CONCURRENT_UPDATE`"
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }

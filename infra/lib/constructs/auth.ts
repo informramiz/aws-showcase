@@ -33,8 +33,8 @@ export class Auth extends Construct {
     });
 
     this.client = this.userPool.addClient("ApiClient", {
-      // SRP for real apps; USER_PASSWORD_AUTH only so the README can show a curl-able sign-in.
-      authFlows: { userSrp: true, userPassword: true },
+      // SRP only: the password never leaves the client.
+      authFlows: { userSrp: true },
       generateSecret: false,
       preventUserExistenceErrors: true,
       accessTokenValidity: Duration.hours(1),

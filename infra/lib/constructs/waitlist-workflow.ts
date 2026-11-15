@@ -52,6 +52,16 @@ export class WaitlistWorkflow extends Construct {
       payloadResponseOnly: true,
       retryOnServiceExceptions: true,
     });
+    // An offer has already taken a seat off the event, and only ResolveOffer gives it back. It is
+    // idempotent (an already resolved offer is a no-op), so unlike OfferSeat it is safe to retry on
+    // application errors too (a hot event item, throttling) for about 8.5 minutes before the
+    // execution fails.
+    resolveOffer.addRetry({
+      errors: ["States.TaskFailed"],
+      interval: Duration.seconds(2),
+      backoffRate: 2,
+      maxAttempts: 8,
+    });
     const seatDone = new Succeed(this, "SeatDone");
     const holdSeat = new Wait(this, "HoldSeat", { time: WaitTime.secondsPath("$.holdSeconds") });
 

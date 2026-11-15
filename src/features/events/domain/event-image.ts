@@ -33,6 +33,10 @@ export const imageKeyFor = (eventId: string, uploadId: string, contentType: Imag
 /** Returns the event id for a key this API issued, or undefined for anything else in the bucket. */
 export const eventIdFromImageKey = (key: string): string | undefined => KEY_PATTERN.exec(key)?.[1];
 
+/** The content type the key promises, from its extension (the presigned URL fixed it at signing). */
+export const imageTypeFromKey = (key: string): ImageContentType | undefined =>
+  IMAGE_CONTENT_TYPES.find((type) => key.endsWith(`.${IMAGE_TYPES[type]}`));
+
 const startsWith = (bytes: Uint8Array, signature: readonly number[], offset = 0): boolean =>
   signature.every((b, i) => bytes[offset + i] === b);
 

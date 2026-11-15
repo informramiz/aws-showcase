@@ -1,4 +1,5 @@
-import { type DynamoDBDocumentClient, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
+import { type DynamoDBDocumentClient, GetCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { NotFoundError } from "../../../shared/errors.js";
 import { GSI1, Keys } from "../../../shared/dynamodb/keys.js";
 import {
@@ -30,6 +31,7 @@ const fromItem = (item: Record<string, unknown>): WaitlistEntry => {
 /** Internal outcomes of one offer attempt, mapped from transaction condition failures. */
 class StaleCandidate extends Error {}
 class NoSeat extends Error {}
+class AlreadyBooked extends Error {}
 class AcceptedMeanwhile extends Error {}
 
 /**
@@ -118,7 +120,8 @@ export class DynamoDbWaitlistRepository implements WaitlistRepository {
         return { offered: true, userId: candidate.userId, offerExpiresAt: offerExpiresAt.toISOString() };
       } catch (error) {
         if (error instanceof NoSeat) return { offered: false };
-        if (!(error instanceof StaleCandidate)) throw error;
+        if (error instanceof AlreadyBooked) await this.closeBooked(candidate, now);
+        else if (!(error instanceof StaleCandidate)) throw error;
       }
     }
     return { offered: false };
@@ -151,6 +154,14 @@ export class DynamoDbWaitlistRepository implements WaitlistRepository {
           },
         },
       },
+      {
+        // Someone who booked directly while waiting must not be handed a second seat.
+        ConditionCheck: {
+          TableName: this.tableName,
+          Key: Keys.attendee(candidate.eventId, candidate.userId),
+          ConditionExpression: "attribute_not_exists(PK)",
+        },
+      },
     ];
     await transactWrite(
       this.db,
@@ -158,10 +169,29 @@ export class DynamoDbWaitlistRepository implements WaitlistRepository {
       (reasons) => {
         if (failedAt(reasons, 0)) return new NoSeat();
         if (failedAt(reasons, 1)) return new StaleCandidate();
+        if (failedAt(reasons, 2)) return new AlreadyBooked();
         return undefined;
       },
       this.retry,
     );
+  }
+
+  /** Takes a booked person off the queue (sparse index) so they stop heading it and counting as waiting. */
+  private async closeBooked(candidate: WaitlistEntry, now: Date): Promise<void> {
+    try {
+      await this.db.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: Keys.waitlistEntry(candidate.eventId, candidate.userId),
+          UpdateExpression: "SET #status = :expired, resolvedAt = :now REMOVE GSI1PK, GSI1SK",
+          ConditionExpression: "#status = :waiting",
+          ExpressionAttributeNames: { "#status": "status" },
+          ExpressionAttributeValues: { ":expired": "EXPIRED", ":waiting": "WAITING", ":now": now.toISOString() },
+        }),
+      );
+    } catch (error) {
+      if (!(error instanceof ConditionalCheckFailedException)) throw error;
+    }
   }
 
   async accept(eventId: string, userId: string, booking: Booking, now: Date): Promise<void> {

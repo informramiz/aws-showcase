@@ -5,8 +5,9 @@ import type { EventRepository } from "../../events/domain/event-repository.js";
 import type { AttendeeDirectory, EventReminder, ReminderPublisher } from "../domain/reminder.js";
 
 /**
- * Scheduler target: publish one `EventReminder` per attendee. Throws if publishing fails so EventBridge
- * Scheduler retries (and then dead-letters); a retry may remind someone twice, which is acceptable.
+ * Scheduler target: publish one `EventReminder` per attendee. Throws if publishing fails: Scheduler calls
+ * Lambda asynchronously, so Lambda retries and then sends the failed event to the async-failure queue.
+ * A retry may remind someone twice, which is acceptable.
  */
 export class SendEventReminders {
   constructor(
