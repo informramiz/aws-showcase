@@ -57,6 +57,19 @@ describe("BookingsStack", () => {
     expect(definition).toContain("States.TaskFailed");
   });
 
+  it("alarms on failed and timed-out waitlist executions", () => {
+    for (const metricName of ["ExecutionsFailed", "ExecutionsTimedOut"]) {
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", { MetricName: metricName, Namespace: "AWS/States" });
+    }
+  });
+
+  it("lets the offer function run the ConditionCheck its transaction contains", () => {
+    const policies = Object.values(template.findResources("AWS::IAM::Policy")) as unknown as Policy[];
+    const offer = policies.find((p) => JSON.stringify(p).includes("OfferWaitlistSeat"));
+    const actions = (offer?.Properties.PolicyDocument.Statement ?? []).flatMap((s) => s.Action);
+    expect(actions).toContain("dynamodb:ConditionCheckItem");
+  });
+
   it("keeps all data in one table with a GSI, PITR and a TTL-backed idempotency table", () => {
     template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
       KeySchema: [

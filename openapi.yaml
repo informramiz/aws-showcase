@@ -248,6 +248,11 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: "`EVENT_STARTED`: the event began while the offer was open"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /me/bookings:
     get:

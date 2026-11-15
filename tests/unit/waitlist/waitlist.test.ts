@@ -156,6 +156,15 @@ describe("waitlist use cases", () => {
     expect(telemetry.counts.get("EventPublishFailed")).toBe(1);
   });
 
+  it("refuses to accept an offer once the event has started", async () => {
+    await join("u1");
+    freeSeat();
+    await offerNext();
+    const event = events.events.get(EVENT_ID);
+    if (event !== undefined) events.events.set(EVENT_ID, { ...event, startsAt: NOW.toISOString() });
+    await expect(accept("u1")).rejects.toMatchObject({ code: "EVENT_STARTED" });
+  });
+
   it("fails loudly if the event vanished under an open offer", async () => {
     await join("u1");
     freeSeat();

@@ -5,8 +5,9 @@ import type { IdGenerator } from "../../../shared/ids.js";
 import type { Telemetry } from "../../../shared/telemetry.js";
 import type { Booking } from "../../bookings/domain/booking.js";
 import { bookingEvent, type BookingEventPublisher } from "../../bookings/domain/booking-events.js";
+import { hasStarted } from "../../events/domain/event.js";
 import type { EventRepository } from "../../events/domain/event-repository.js";
-import { assertOfferOpen } from "../domain/waitlist.js";
+import { assertOfferOpen, WaitlistErrors } from "../domain/waitlist.js";
 import type { WaitlistRepository } from "../domain/waitlist-repository.js";
 
 /** A waitlisted user takes the seat held for them. The result is an ordinary one-seat booking. */
@@ -25,6 +26,8 @@ export class AcceptOffer {
     assertOfferOpen(await this.waitlist.find(eventId, actor.userId), now);
     const event = await this.events.findById(eventId);
     if (event === undefined) throw new Error(`Event ${eventId} missing for an open waitlist offer`);
+    // Same rule as a direct booking: an offer made just before the start can outlive it.
+    if (hasStarted(event, now)) throw WaitlistErrors.eventStarted();
 
     const booking: Booking = {
       id: this.ids.next(),

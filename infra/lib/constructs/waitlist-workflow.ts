@@ -1,5 +1,6 @@
 import type { RemovalPolicy } from "aws-cdk-lib";
 import { Duration } from "aws-cdk-lib";
+import { Alarm, ComparisonOperator, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { IFunction } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import {
@@ -110,5 +111,21 @@ export class WaitlistWorkflow extends Construct {
         includeExecutionData: false,
       },
     });
+
+    // A failed or timed-out execution can leave one offered seat held (see README, Known limits). The
+    // alarm is how an operator hears about it; wire alarmActions to a topic for real use.
+    for (const [name, metric] of [
+      ["ExecutionsFailed", this.stateMachine.metricFailed({ period: Duration.minutes(5) })],
+      ["ExecutionsTimedOut", this.stateMachine.metricTimedOut({ period: Duration.minutes(5) })],
+    ] as const) {
+      new Alarm(this, `${name}Alarm`, {
+        metric,
+        threshold: 1,
+        evaluationPeriods: 1,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        treatMissingData: TreatMissingData.NOT_BREACHING,
+        alarmDescription: "A waitlist execution ended abnormally; an offered seat may be held. Check the execution.",
+      });
+    }
   }
 }

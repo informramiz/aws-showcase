@@ -117,7 +117,8 @@ export class BookingsStack extends Stack {
     data.idempotencyTable.grant(projectEventStats, "dynamodb:PutItem");
     data.table.grant(joinWaitlist, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:ConditionCheckItem");
     data.table.grant(acceptOffer, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem");
-    data.table.grant(offerSeat, "dynamodb:Query", "dynamodb:UpdateItem");
+    // Offering is one transaction: Update (event, entry) plus a ConditionCheck on the attendee marker.
+    data.table.grant(offerSeat, "dynamodb:Query", "dynamodb:UpdateItem", "dynamodb:ConditionCheckItem");
     data.table.grant(resolveOffer, "dynamodb:GetItem", "dynamodb:UpdateItem");
     data.table.grant(sendReminders, "dynamodb:GetItem", "dynamodb:Query");
     images.grantUpload(createImageUpload);

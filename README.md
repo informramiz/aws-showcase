@@ -190,6 +190,7 @@ Everything is pay per use, with nothing always on and no NAT gateway (no functio
 - **Cognito MFA and the Plus feature plan are off** (acknowledged in cdk-nag). Both are a sensible default in production, but they add cost and setup a demo doesn't need.
 - **Notifications are a stub.** The worker logs the message. A real adapter (SES, SNS, a push provider) would implement the same `Notifier` port.
 - **Waitlist race.** A cancellation returns its seats to `seatsRemaining` straight away, so a direct booking can take the seat before the workflow offers it. The offer then finds no seat, and the person stays in line. A production version would hold freed seats for the waitlist while anyone is waiting.
+- **A failed waitlist run can hold a seat.** An offer takes a seat off the event, and only `ResolveWaitlistOffer` gives it back. It retries for about 8 minutes, but if it still fails, or the run times out, that seat stays held and nobody can accept it. Two CloudWatch alarms (`ExecutionsFailed`, `ExecutionsTimedOut`) flag this. A production version would add a compensation step or a sweeper that expires old `OFFERED` entries.
 - **Reminders are at least once.** Scheduler and the queue can both retry, so an attendee may rarely get a duplicate reminder. A changed start time doesn't move the schedule yet; that would need an `UpdateSchedule` on `MODIFY`.
 - **Stats are eventually consistent**, usually a second behind the table.
 - **No WAF or custom domain**, both of which a public production API would have.
